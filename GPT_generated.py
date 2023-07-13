@@ -23,25 +23,7 @@ export_black_line_stats = export_filename("_BlackLineStats.dat")
 export_odd_even_psds = export_filename("_OddEvenPSDs.dat")
 export_odd_even_plots = export_filename("_OddEvenPlots.png")
 
-----------------------------------------------------------------------------------------------------------------------------
-
-imax = 2 ** np.floor(np.log2(height))
-lmax = imax if height >= imax + 40 else imax
-print("imax =", imax)
-print("lmax =", lmax)
-kscale = 2 * np.pi / (lmax * scale)
-print("kscale =", kscale, "nm^-1")
-
-def extract_center_part(im, si):
-    he, wi = im.shape
-    ro = (he - si) // 2
-    co = (wi - si) // 2
-    return im[ro:ro+si, co:co+si]
-
-def clip_image(img):
-    xlow = scoreatpercentile(img.flatten(), 0.05)
-    xhigh = scoreatpercentile(img.flatten(), 99.95)
-    return np.clip((img - xlow) / (xhigh - xlow), 0.0, 1.0)
+#----------------------------------------------------------------------------------------------------------------------------
 
 def fourier_img(im):
     fim = np.abs(fftshift(fft2(im))) ** 2

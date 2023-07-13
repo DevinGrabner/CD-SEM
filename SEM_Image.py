@@ -1,4 +1,5 @@
-import CD_SEM_tools as CD
+import CD_SEM_tools as tools
+import CD_SEM_Calc as calc
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import tifffile
@@ -9,7 +10,7 @@ TAG_NAMES: Final[list[str]] = ["ImageWidth", "ImageLength", "CZ_SEM"]
 PIX_SIZE: Final[str] = "ap_image_pixel_size"
 IMAGE_SCALE_UM: Final[float] = 0.2  # Image scale bar length in micrometers
 
-######### This object holds 48 properties from CD-SEM analyis. It only auto initializes values pulled directly from the header file of the '.fit' SEM image.
+######### This object holds 52 properties from CD-SEM analyis. It only auto initializes values pulled directly from the header file of the '.fit' SEM image.
 ######### The __call__ function will display 'self.image' with the specificed global scale bar.
 
 
@@ -21,9 +22,17 @@ class SEMImageDetails:
         self.pix_scale, self.pix_size, self.pix_dimen = self._pix_data(
             self.path, TAG_NAMES[2]
         )
+        self.imax: float | None = None  # See ImgFlat.lmax for details on variables
+        self.lmax: float | None = None
+        self.kscale: float | None = None
+        self.image_FFT_center: None | float = (
+            None  # Magnitude square of the zero frequency of the FFT image
+        )
+
         # Images
         self.image = tifffile.imread(self.path)  # Original
-        self.image_FFT = None  # Fourier image
+        self.image_clipped = None  # Clipped image used for FFT analysis
+        self.image_FFT = None  # log of Fourier image
         self.image_flat = None  # Flattened image
         self.image_binary = None  # Black and White Binary image
         self.image_color = None  # Colorized image
@@ -76,42 +85,56 @@ class SEMImageDetails:
         self.BLPA_crossline_A: None | float = None  # nm # Cross Line A_o
         self.BLPA_inline: None | float = None  # nm # In Line
 
-    # def print()
+    def __call__(self):
+        self.imax, self.lmax, self.kscale = calc.lmax(
+            self.height, self.pix_scale, self.pix_size
+        )
+        self.image = tools.rescale_array(
+            calc.ExtractCenterPart(self.image, self.lmax), 0, 1
+        )
+        self.image_FFT, self.image_FFT_center = calc.fourier_img(self.image, self.lmax)
 
-    def __call__(self, image):
+    def display(self: object, image: tifffile, bar=False) -> None:
+        """Displays an image with scale bar (if wanted) based on pixel size from the image
+
+        Args:
+            image (np.ndarray): image that you want displayed
+            bar (bool, optional): Option to display scale bar on image. Defaults to False.
+        """
         global IMAGE_SCALE_UM
 
         # Plot the image
         plt.imshow(image, cmap="gray")
         plt.axis("off")
 
-        # Calculate the dimensions of the scale bar
-        image_height = image.shape[0]
-        scale_bar_length_pixels = (IMAGE_SCALE_UM * self.pix_scale) / self.pix_size
+        if bar == True:
+            # Calculate the dimensions of the scale bar
+            image_height = image.shape[0]
+            scale_bar_length_pixels = (IMAGE_SCALE_UM * self.pix_scale) / self.pix_size
 
-        # Calculate the position of the scale bar
-        scale_bar_x = image.shape[1] - scale_bar_length_pixels - 100
-        scale_bar_y = image_height - 50
+            # Calculate the position of the scale bar
+            scale_bar_x = image.shape[1] - scale_bar_length_pixels - 100
+            scale_bar_y = image_height - 50
 
-        # Add the scale bar to the plot
-        scale_bar = patches.Rectangle(
-            (scale_bar_x, scale_bar_y),
-            scale_bar_length_pixels,
-            5,
-            edgecolor="white",
-            facecolor="white",
-        )
-        plt.gca().add_patch(scale_bar)
+            # Add the scale bar to the plot
+            scale_bar = patches.Rectangle(
+                (scale_bar_x, scale_bar_y),
+                scale_bar_length_pixels,
+                5,
+                edgecolor="white",
+                facecolor="white",
+            )
+            plt.gca().add_patch(scale_bar)
 
-        # Add text for the scale bar length
-        scale_bar_text = f"{IMAGE_SCALE_UM} µm"
-        plt.text(
-            scale_bar_x + scale_bar_length_pixels / 2,
-            scale_bar_y - 20,
-            scale_bar_text,
-            color="white",
-            ha="center",
-        )
+            # Add text for the scale bar length
+            scale_bar_text = f"{IMAGE_SCALE_UM} µm"
+            plt.text(
+                scale_bar_x + scale_bar_length_pixels / 2,
+                scale_bar_y - 20,
+                scale_bar_text,
+                color="white",
+                ha="center",
+            )
 
         # Show the plot
         plt.show()
@@ -123,7 +146,7 @@ class SEMImageDetails:
             _type_: _description_
         """
 
-        CD.open_window()
+        tools.open_window()
         file_path = filedialog.askopenfilename(
             filetypes=[("TIFF Files", "*.tif"), ("All Files", "*.*")]
         )
