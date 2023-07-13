@@ -12,7 +12,7 @@ TAG_NAMES: Final[list[str]] = ["ImageWidth", "ImageLength", "CZ_SEM"]
 PIX_SIZE: Final[str] = "ap_image_pixel_size"
 IMAGE_SCALE_UM: Final[float] = 0.2  # Image scale bar length in micrometers
 
-######### This object holds 53 properties from CD-SEM analyis. It only auto initializes values pulled directly from the header file of the '.fit' SEM image.
+######### This object holds 54 properties from CD-SEM analyis. It only auto initializes values pulled directly from the header file of the '.fit' SEM image.
 ######### The __call__ function will run all the necassary calculations to assign values to all object properties
 
 
@@ -24,11 +24,14 @@ class SEMImageDetails:
         self.pix_scale, self.pix_size, self.pix_dimen = self._pix_data(
             self.path, TAG_NAMES[2]
         )
-        self.imax: float | None = None  # See ImgFlat.lmax for details on variables
-        self.lmax: float | None = None
+        self.imax: int | None = None  # See ImgFlat.lmax for details on variables
+        self.lmax: int | None = None
         self.kscale: float | None = None
         self.image_FFT_center: None | float = (
             None  # Magnitude square of the zero frequency of the FFT image
+        )
+        self.image_rotate: None | float = (
+            None  # The angle the image needs rotated to make sure the FFT is horizontal
         )
 
         # Images
@@ -88,13 +91,14 @@ class SEMImageDetails:
         self.BLPA_inline: None | float = None  # nm # In Line
 
     def __call__(self):
-        self.imax, self.lmax, self.kscale = calc.lmax(
+        self.imax, self.lmax, self.kscale = calc.image_size(
             self.height, self.pix_scale, self.pix_size
         )
         self.image = tools.rescale_array(
-            calc.ExtractCenterPart(self.image, self.lmax), 0, 1
+            calc.extract_center_part(self.image, self.lmax), 0, 1
         )
         self.image_FFT, self.image_FFT_center = calc.fourier_img(self.image)
+        self.image_rotate = calc.rotated_angle(25, self.image_FFT, self.lmax)
 
     def _sem_image_selector(self) -> str:
         """Lets you select the image file for the object
@@ -138,7 +142,7 @@ class SEMImageDetails:
         PixelList = list(ImagTagDict.get("ap_image_pixel_size"))
 
         # Checks the pixel dimesion and assigns the appropriate scale so the dimensions are in um
-        unitConversion = {"pm": 10**6, "nm": 10**3, "um": 1}
+        unitConversion = {"pm": 10**-6, "nm": 10**-3, "um": 1}
         if PixelList[2] not in unitConversion:
             while True:
                 PixelList[1] = float(
@@ -147,7 +151,7 @@ class SEMImageDetails:
                     )
                 )
                 if PixelList[1] > 0:
-                    PixelList[0] = 10**3
+                    PixelList[0] = 10**-3
                     PixelList[2] = "nm"
                     break
         PixelList[0] = unitConversion.get(PixelList[2])

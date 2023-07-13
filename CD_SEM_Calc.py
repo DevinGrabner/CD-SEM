@@ -1,5 +1,6 @@
 import CD_SEM_tools as tools
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.fftpack import fftshift, fft2  # , ifft2
 
 # from scipy.ndimage import gaussian_filter, morphology
@@ -10,7 +11,9 @@ from scipy.stats import scoreatpercentile
 # import matplotlib.pyplot as plt
 
 
-def lmax(height: int, pixel_scale: float, pixel_size: float) -> tuple[int, int, float]:
+def image_size(
+    height: int, pixel_scale: float, pixel_size: float
+) -> tuple[int, int, float]:
     """This function calculates and return imax, lmax, and kscale which are needed throughout later functions.
 
     Args:
@@ -23,13 +26,13 @@ def lmax(height: int, pixel_scale: float, pixel_size: float) -> tuple[int, int, 
         lmax (int): size of the image for Fourier Filtering. Ideally it will be 40 pixels larger than imax to later be able to cut 20 pixels on each side to trim the edges containing issues from size-effects.
         kscale (float): Reciprocal space for lmax in inverse nanometers
     """
-    imax = 2 ** np.floor(np.log2(height))
+    imax = int(2 ** np.floor(np.log2(height)))
     lmax = (imax + 40) if height >= (imax + 40) else imax
     kscale = 2 * np.pi / (lmax * pixel_size * pixel_scale * 10**3)
     return imax, lmax, kscale
 
 
-def ExtractCenterPart(img: np.ndarray, size: int) -> np.ndarray:
+def extract_center_part(img: np.ndarray, size: int) -> np.ndarray:
     """Extracts a square submatrix of size "size" from the center part of the larger matrix "img"
     roi_w & roi_h = region of interest
 
@@ -55,7 +58,6 @@ def fourier_img(img: np.ndarray) -> tuple[np.ndarray, float]:
 
     Args:
         img (np.ndarray): Clipped and Rescaled image that need processed
-        lmax (int): size of the image for Fourier Filtering
 
     Returns:
         tuple[np.ndarray, float]: FFT image, Magnitude square of the zero frequency
@@ -65,6 +67,69 @@ def fourier_img(img: np.ndarray) -> tuple[np.ndarray, float]:
     ctrval = fimg[center, center]
     fimg[center, center] = 1
     return tools.rescale_array(np.log(fimg), 0, 1), ctrval
+
+
+def rotated_angle(probe: int, img: np.ndarray, lmax: int) -> float:
+    """_summary_
+
+    Args:
+        probe (int): Maximum number of pixels to rotate by
+        img (np.ndarray): FFT image being analyized
+        lmax (int): Size of FFT image
+
+    Returns:
+        float: angle the image needs rotated
+    """
+    def calculatetotals(probe: int, img: np.ndarray, lmax: int) -> np.ndarray:
+        totals = []
+        for l in range(-probe, probe + 1):
+            indices = np.array(
+                [
+                    (round((j - lmax / 2 - 1) * (l / (lmax / 2 - 1)) + lmax / 2 + 1), j)
+                    for j in range(lmax)
+                ]
+            )
+            values = img[indices[:, 0], indices[:, 1]]
+            total = np.sum(values)
+            totals.append(total)
+        totals = np.array(totals)
+        return totals
+
+    def movingmedian(data: np.ndarray, window_size: int) -> float:
+        padded_data = np.pad(data, (window_size - 1) // 2, mode="edge")
+        windowed_data = np.lib.stride_tricks.sliding_window_view(
+            padded_data, window_size
+        )
+        medians = np.apply_along_axis(lambda x: np.median(x), 1, windowed_data)
+        return medians
+
+    totals = calculatetotals(probe, img, lmax)
+    totals2 = movingmedian(totals, 7)
+
+    max_index = np.argmax(totals2)
+    if totals2[max_index] / totals[probe] > 1.05:
+        ra = np.arctan((max_index - (probe - 3 + 1)) / (lmax / 2 - 1)) * 180 / np.pi
+    else:
+        ra = 0
+    print("Angle of rotation:", ra)
+
+    angle_range = np.linspace(-probe, probe, len(totals))
+    angle_range_plusminus3 = np.linspace(-probe + 3, probe - 3, len(totals2))
+
+    plt.plot(angle_range, totals, marker="o", linestyle="-", label="Totals")
+    plt.plot(angle_range_plusminus3, totals2, label="Moving Median")
+
+    plt.xlabel("angle (deg)")
+    plt.ylabel("Intensity")
+    plt.title("Finding Image Rotation")
+    plt.legend()
+    plt.axvline(
+        x=ra, color="red", linestyle="--", label="RA"
+    )  # Add vertical line at ra
+
+    plt.show()
+
+    return ra
 
 
 def clip_image(img: np.ndarray) -> np.ndarray:
