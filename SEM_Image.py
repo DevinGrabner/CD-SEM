@@ -2,6 +2,8 @@ import CD_SEM_tools as tools
 import CD_SEM_Calc as calc
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.colors import LinearSegmentedColormap
+import numpy as np
 import tifffile
 from tkinter import filedialog
 from typing import Final
@@ -10,8 +12,8 @@ TAG_NAMES: Final[list[str]] = ["ImageWidth", "ImageLength", "CZ_SEM"]
 PIX_SIZE: Final[str] = "ap_image_pixel_size"
 IMAGE_SCALE_UM: Final[float] = 0.2  # Image scale bar length in micrometers
 
-######### This object holds 52 properties from CD-SEM analyis. It only auto initializes values pulled directly from the header file of the '.fit' SEM image.
-######### The __call__ function will display 'self.image' with the specificed global scale bar.
+######### This object holds 53 properties from CD-SEM analyis. It only auto initializes values pulled directly from the header file of the '.fit' SEM image.
+######### The __call__ function will run all the necassary calculations to assign values to all object properties
 
 
 class SEMImageDetails:
@@ -92,88 +94,42 @@ class SEMImageDetails:
         self.image = tools.rescale_array(
             calc.ExtractCenterPart(self.image, self.lmax), 0, 1
         )
-        self.image_FFT, self.image_FFT_center = calc.fourier_img(self.image, self.lmax)
+        self.image_FFT, self.image_FFT_center = calc.fourier_img(self.image)
 
-    def display(self: object, image: tifffile, bar=False) -> None:
-        """Displays an image with scale bar (if wanted) based on pixel size from the image
-
-        Args:
-            image (np.ndarray): image that you want displayed
-            bar (bool, optional): Option to display scale bar on image. Defaults to False.
-        """
-        global IMAGE_SCALE_UM
-
-        # Plot the image
-        plt.imshow(image, cmap="gray")
-        plt.axis("off")
-
-        if bar == True:
-            # Calculate the dimensions of the scale bar
-            image_height = image.shape[0]
-            scale_bar_length_pixels = (IMAGE_SCALE_UM * self.pix_scale) / self.pix_size
-
-            # Calculate the position of the scale bar
-            scale_bar_x = image.shape[1] - scale_bar_length_pixels - 100
-            scale_bar_y = image_height - 50
-
-            # Add the scale bar to the plot
-            scale_bar = patches.Rectangle(
-                (scale_bar_x, scale_bar_y),
-                scale_bar_length_pixels,
-                5,
-                edgecolor="white",
-                facecolor="white",
-            )
-            plt.gca().add_patch(scale_bar)
-
-            # Add text for the scale bar length
-            scale_bar_text = f"{IMAGE_SCALE_UM} µm"
-            plt.text(
-                scale_bar_x + scale_bar_length_pixels / 2,
-                scale_bar_y - 20,
-                scale_bar_text,
-                color="white",
-                ha="center",
-            )
-
-        # Show the plot
-        plt.show()
-
-    def _sem_image_selector(self):
-        """_summary_
+    def _sem_image_selector(self) -> str:
+        """Lets you select the image file for the object
 
         Returns:
-            _type_: _description_
+            file_path (str): file path to the image
         """
-
         tools.open_window()
         file_path = filedialog.askopenfilename(
             filetypes=[("TIFF Files", "*.tif"), ("All Files", "*.*")]
         )
         return file_path
 
-    def _sem_image_tag(self, file_path, tag_name):
-        """_summary_
+    def _sem_image_tag(self, file_path: str, tag_name: str) -> any:
+        """Fetches information from the .tif file header
 
         Args:
-            file_path (_type_): _description_
-            tag_name (_type_): _description_
+            file_path (str): file path to the image
+            tag_name (str): Name of the tag in the header we want the associated value for.
 
         Returns:
-            _type_: _description_
+            any: the value for the input tag
         """
         metadata = tifffile.TiffFile(file_path)
         return metadata.pages[0].tags[tag_name].value
 
-    def _pix_data(self, file_path, tag_name):
-        """_summary_
+    def _pix_data(self, file_path: str, tag_name: str) -> tuple:
+        """Fetches the data associated with the image pixel dimensions from the library in the header
 
         Args:
-            file_path (_type_): _description_
-            tag_name (_type_): _description_
+            file_path (str): file path to the image
+            tag_name (str): Name of the tag in the header we want the associated value for.
 
         Returns:
-            _type_: _description_
+            tuple: [pixel_name, pixel_size, pixel_dimension]
         """
         global PIX_SIZE
 
@@ -196,3 +152,68 @@ class SEMImageDetails:
                     break
         PixelList[0] = unitConversion.get(PixelList[2])
         return PixelList
+
+    def display_SEM_image(self: object, image: tifffile, bar=False) -> None:
+        """Displays an image with scale bar (if wanted) based on pixel size from the image
+
+        Args:
+            image (np.ndarray): image that you want displayed
+            bar (bool, optional): Option to display scale bar on image. Defaults to False.
+        """
+        global IMAGE_SCALE_UM
+
+        # Plot the image
+        plt.imshow(image, cmap="gray")
+        plt.axis("off")
+
+        if bar:
+            # Calculate the dimensions of the scale bar
+            image_height = image.shape[0]
+            scale_bar_length_pixels = (IMAGE_SCALE_UM * self.pix_scale) / self.pix_size
+
+            # Calculate the position of the scale bar
+            scale_bar_x = image.shape[1] - scale_bar_length_pixels - 100
+            scale_bar_y = image_height - 50
+
+            # Add the scale bar to the plot
+            scale_bar = patches.Rectangle(
+                (scale_bar_x, scale_bar_y),
+                scale_bar_length_pixels,
+                5,
+                edgecolor="white",
+                facecolor="white",
+                linewidth=2,
+            )
+            plt.gca().add_patch(scale_bar)
+
+            # Add text for the scale bar length
+            scale_bar_text = f"{IMAGE_SCALE_UM} µm"
+            text_props = dict(facecolor="white", edgecolor="white", linewidth=1)
+            plt.text(
+                scale_bar_x + scale_bar_length_pixels / 2,
+                scale_bar_y - 20,
+                scale_bar_text,
+                color="white",
+                ha="center",
+            )
+
+        # Show the plot
+        plt.show()
+
+    def display_fft_image(self: object, fimg: np.ndarray) -> None:
+        """Displays the scaled FFT image on a colorblind friendly colorbar
+
+        Args:
+            fimg (np.ndarray): FFT image getting displayed
+        """
+        # Define a colorblind-friendly colormap
+        cmap = LinearSegmentedColormap.from_list(
+            "colorblind_cmap", ["#000000", "#377eb8", "#ff7f00", "#4daf4a"], N=256
+        )
+
+        # Plot the FFT image
+        plt.imshow(fimg, cmap=cmap)
+        plt.colorbar(label="Intensity")
+        plt.title("FFT Image")
+        plt.axis("off")
+        plt.show()
