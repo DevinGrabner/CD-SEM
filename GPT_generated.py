@@ -25,26 +25,6 @@ export_odd_even_plots = export_filename("_OddEvenPlots.png")
 
 #----------------------------------------------------------------------------------------------------------------------------
 
-def fourier_img(im):
-    fim = np.abs(fftshift(fft2(im))) ** 2
-    ctrval = fim[lmax//2, lmax//2]
-    fim[lmax//2, lmax//2] = 1
-    return fim, ctrval
-
-def rotated_angle(probe, img):
-    def straightline(n):
-        return [(int(round((j - lmax/2 - 1) * (n/(lmax/2 - 1)) + lmax/2 + 1)), j) for j in range(lmax)]
-
-    totals = []
-    for l in range(-probe, probe+1):
-        line = [img[j, i] for i, j in straightline(l)]
-        totals.append(np.sum(line))
-    totals2 = np.median(totals, size=7)
-    ra = 0
-    if np.max(totals2) / totals[probe] > 1.05:
-        ra = np.arctan((np.argmax(totals2) - (probe - 3 + 1)) / (lmax/2 - 1)) * 180 / np.pi
-    return ra
-
 def fourier_pitch(img, theta):
     intqxave = np.sum(np.rot90(img, k=-1, axes=(0, 1)), axis=1)
     background = np.median(intqxave)
