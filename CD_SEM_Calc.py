@@ -62,8 +62,8 @@ def fourier_img(img: np.ndarray) -> tuple[np.ndarray, float]:
     Returns:
         tuple[np.ndarray, float]: FFT image, Magnitude square of the zero frequency
     """
-    center = np.array(img.shape) // 2
     fimg = np.abs(fftshift(fft2(img))) ** 2
+    center = np.array(fimg.shape) // 2
     ctrval = fimg[center, center]
     fimg[center, center] = 1
     return tools.rescale_array(np.log(fimg), 0, 1), ctrval
@@ -80,6 +80,7 @@ def rotated_angle(probe: int, img: np.ndarray, lmax: int) -> float:
     Returns:
         float: angle the image needs rotated
     """
+
     def calculatetotals(probe: int, img: np.ndarray, lmax: int) -> np.ndarray:
         totals = []
         for l in range(-probe, probe + 1):
