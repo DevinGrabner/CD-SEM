@@ -31,9 +31,15 @@ If you need to create a new environment, do the following in an Anaconda PowerSh
       conda create --name myenv python=3.10.12    # This creates your new environment and installs the specified version of Python
       conda activate myenv                        # This activates your new environment so you can use it
       python --version                            # Verify that the correct version of Python is installed
+      conda install conda
+      conda update -n myenv -c defaults conda
+      conda install numpy matplotlib notebook ipywidgets scipy tifffile typing scikit-image
       
   If you want to install a different version of Python in an existing environment, do the following in an Anaconda PowerShell:
 
       conda activate your_environment_name        # This activates the environment you want to use
       conda install python=3.10.12                # This installs the specified version of Python in that environment
       python --version                            # Verify that the correct version of Python is installed
+      conda install conda
+      conda update -n myenv -c defaults conda
+      conda install numpy matplotlib notebook ipywidgets scipy tifffile typing scikit-image
