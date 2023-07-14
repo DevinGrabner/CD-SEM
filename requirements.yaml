@@ -1,0 +1,11 @@
+name: CD_SEM
+dependencies:
+  - python=3.10.12
+  - numpy
+  - matplotlib
+  - notebook
+  - ipywidgets
+  - scipy
+  - tkinter
+  - tifffile
+  - typing
