@@ -9,3 +9,4 @@ dependencies:
   - tkinter
   - tifffile
   - typing
+  - scikit-image
