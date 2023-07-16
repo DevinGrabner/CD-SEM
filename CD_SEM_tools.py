@@ -29,3 +29,19 @@ def rescale_array(arr: np.ndarray, new_min: float, new_max: float) -> np.ndarray
         scaled_arr * (new_max - new_min) + new_min
     )  # Rescale to the new range
     return rescaled_arr
+
+
+def threashold_mask(img: np.ndarray, threshold: float, new_value: float = 0) -> np.ndarray:
+    """Sets all values in an array below the threashold to the new_value
+
+    Args:
+        img (np.ndarray): imgage array to have the mask applied to
+        threshold (float): The lowest value being kept
+        new_value (float): The value assigned to all pixels below threshold: Default zero
+
+    Returns:
+        np.ndarray: Output image array
+    """
+    new_img = np.copy(img)
+    new_img[img < threshold] = new_value
+    return new_img

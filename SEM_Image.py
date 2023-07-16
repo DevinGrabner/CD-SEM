@@ -11,6 +11,7 @@ from typing import Final
 TAG_NAMES: Final[list[str]] = ["ImageWidth", "ImageLength", "CZ_SEM"]
 PIX_SIZE: Final[str] = "ap_image_pixel_size"
 IMAGE_SCALE_UM: Final[float] = 0.2  # Image scale bar length in micrometers
+MASK_THRESHOLD: Final[float] = 0.9  # Threshold for binary mask
 
 ######### This object holds 54 properties from CD-SEM analyis. It only auto initializes values pulled directly from the header file of the '.fit' SEM image.
 ######### The __call__ function will run all the necassary calculations to assign values to all object properties
@@ -27,12 +28,8 @@ class SEMImageDetails:
         self.imax: int | None = None  # See ImgFlat.lmax for details on variables
         self.lmax: int | None = None
         self.kscale: float | None = None
-        self.image_FFT_center: None | float = (
-            None  # Magnitude square of the zero frequency of the FFT image
-        )
-        self.image_rotate: None | float = (
-            None  # The angle the image needs rotated to make sure the FFT is horizontal
-        )
+        self.rescale_values: None | list = [None] * 3  # Magnitude square of the zero frequency, minimum and maximum pixel values from the unnormalized FFT image
+        self.image_rotate: None | float = None  # The angle the image needs rotated to make sure the FFT is horizontal
 
         # Images
         self.image = tifffile.imread(self.path)  # Original
@@ -91,14 +88,13 @@ class SEMImageDetails:
         self.BLPA_inline: None | float = None  # nm # In Line
 
     def __call__(self):
+
         self.imax, self.lmax, self.kscale = calc.image_size(
             self.height, self.pix_scale, self.pix_size
         )
-        self.image = tools.rescale_array(
-            calc.extract_center_part(self.image, self.lmax), 0, 1
-        )
-        self.image_FFT, self.image_FFT_center = calc.fourier_img(self.image)
-        self.image_rotate = calc.rotated_angle(25, self.image_FFT, self.lmax)
+        self.image = calc.clip_image(calc.extract_center_part(self.image, self.lmax))
+        self.image_FFT, self.rescale_values = calc.fourier_img(np.copy(self.image))
+        self.image_rotate = calc.rotated_angle(25, tools.threashold_mask(self.image_FFT, MASK_THRESHOLD), self.lmax)
 
     def _sem_image_selector(self) -> str:
         """Lets you select the image file for the object
@@ -172,12 +168,11 @@ class SEMImageDetails:
 
         if bar:
             # Calculate the dimensions of the scale bar
-            image_height = image.shape[0]
-            scale_bar_length_pixels = (IMAGE_SCALE_UM * self.pix_scale) / self.pix_size
+            scale_bar_length_pixels = IMAGE_SCALE_UM / (self.pix_scale * self.pix_size)
 
             # Calculate the position of the scale bar
             scale_bar_x = image.shape[1] - scale_bar_length_pixels - 100
-            scale_bar_y = image_height - 50
+            scale_bar_y = image.shape[0] - 50
 
             # Add the scale bar to the plot
             scale_bar = patches.Rectangle(
@@ -204,19 +199,25 @@ class SEMImageDetails:
         # Show the plot
         plt.show()
 
-    def display_fft_image(self: object, fimg: np.ndarray) -> None:
+    def display_fft_image(self: object, fimg: np.ndarray, mask=False) -> None:
         """Displays the scaled FFT image on a colorblind friendly colorbar
 
         Args:
             fimg (np.ndarray): FFT image getting displayed
         """
         # Define a colorblind-friendly colormap
+        global MASK_THRESHOLD
+
         cmap = LinearSegmentedColormap.from_list(
             "colorblind_cmap", ["#000000", "#377eb8", "#ff7f00", "#4daf4a"], N=256
         )
 
+        if mask:
+            plt.imshow(tools.threashold_mask(fimg, MASK_THRESHOLD), cmap=cmap)
+        else:
+            plt.imshow(fimg, cmap=cmap)
+
         # Plot the FFT image
-        plt.imshow(fimg, cmap=cmap)
         plt.colorbar(label="Intensity")
         plt.title("FFT Image")
         plt.axis("off")

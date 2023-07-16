@@ -2,6 +2,8 @@ import CD_SEM_tools as tools
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fftpack import fftshift, fft2  # , ifft2
+from scipy.ndimage import median_filter
+from skimage.draw import line
 
 # from scipy.ndimage import gaussian_filter, morphology
 from scipy.stats import scoreatpercentile
@@ -29,7 +31,7 @@ def image_size(
     imax = int(2 ** np.floor(np.log2(height)))
     lmax = (imax + 40) if height >= (imax + 40) else imax
     kscale = 2 * np.pi / (lmax * pixel_size * pixel_scale * 10**3)
-    return imax, lmax, kscale
+    return imax, (lmax-1)|1, kscale # Guarantees lmax is ODD insuring a pixel at the very center of the image
 
 
 def extract_center_part(img: np.ndarray, size: int) -> np.ndarray:
@@ -44,13 +46,14 @@ def extract_center_part(img: np.ndarray, size: int) -> np.ndarray:
         np.arry: subarray defined by the indices
     """
     height, width = img.shape
-    roi_h = int(np.maximum(np.floor((height - size) / 2), 0))
-    roi_w = int(np.maximum(np.floor((width - size) / 2), 0))
+    dimension = min(height, width)
+    roi_h = int(max(0,np.floor((dimension - size) / 2)))
+    roi_w = int(max(0,np.floor((dimension - size) / 2)))
     # roi = 0  when there is a data zone below zero
     return img[roi_h : int(roi_h + size), roi_w : int(roi_w + size)]
 
 
-def fourier_img(img: np.ndarray) -> tuple[np.ndarray, float]:
+def fourier_img(img: np.ndarray) -> tuple[np.ndarray, tuple]:
     """Calculates the magnitude squared of the Fourier Transform of a square image "img" of size "lmax".
     It recenters it so that the zero frequency is at {lmax/2+1, lmax/2+1}. It saves the magnitude square
     of the zero frequency in a variable called "ctrval". The zero frequncy in the image is replaced by "1" to help
@@ -60,17 +63,20 @@ def fourier_img(img: np.ndarray) -> tuple[np.ndarray, float]:
         img (np.ndarray): Clipped and Rescaled image that need processed
 
     Returns:
-        tuple[np.ndarray, float]: FFT image, Magnitude square of the zero frequency
+        tuple[np.ndarray, tuple]: FFT image, Magnitude square of the zero frequency
     """
-    fimg = np.abs(fftshift(fft2(img))) ** 2
+    fimg = np.abs(fftshift(fft2(np.copy(img)))) ** 2
     center = np.array(fimg.shape) // 2
-    ctrval = fimg[center, center]
-    fimg[center, center] = 1
-    return tools.rescale_array(np.log(fimg), 0, 1), ctrval
+    rescale_values = (fimg[center, center], np.min(fimg), np.max(fimg))
+    fimg = tools.rescale_array(np.log(fimg), 0, 1)
+    return fimg, rescale_values
 
 
-def rotated_angle(probe: int, img: np.ndarray, lmax: int) -> float:
-    """_summary_
+def rotated_angle(angle: float, img: np.ndarray, lmax: int) -> float:
+    """Integrates the I(qx, qy = 0) line (the horizontal center line).
+    It also probes different rotation values by rotating the image one pixel at a time up to "probe" pixels.
+    It then plots the integral values vs rotated amount. It picks the maximum value to be the one that indicates the "true" horizontal position.
+    It returns the rotated angle in degrees. "probe needs to be an ODD number"
 
     Args:
         probe (int): Maximum number of pixels to rotate by
@@ -80,38 +86,21 @@ def rotated_angle(probe: int, img: np.ndarray, lmax: int) -> float:
     Returns:
         float: angle the image needs rotated
     """
+    def line_sum(a, img):
+        dy = int(np.ceil((lmax/2)*np.arctan(np.radians(a))))
+        rr, cc = line(0, int(lmax//2 - dy), lmax-1, int(lmax//2 + dy))
+        return np.sum(img[rr, cc])
 
-    def calculatetotals(probe: int, img: np.ndarray, lmax: int) -> np.ndarray:
-        totals = []
-        for l in range(-probe, probe + 1):
-            indices = np.array(
-                [
-                    (round((j - lmax / 2 - 1) * (l / (lmax / 2 - 1)) + lmax / 2 + 1), j)
-                    for j in range(lmax)
-                ]
-            )
-            values = img[indices[:, 0], indices[:, 1]]
-            total = np.sum(values)
-            totals.append(total)
-        totals = np.array(totals)
-        return totals
-
-    def movingmedian(data: np.ndarray, window_size: int) -> float:
-        padded_data = np.pad(data, (window_size - 1) // 2, mode="edge")
-        windowed_data = np.lib.stride_tricks.sliding_window_view(
-            padded_data, window_size
-        )
-        medians = np.apply_along_axis(lambda x: np.median(x), 1, windowed_data)
-        return medians
-
-    totals = calculatetotals(probe, img, lmax)
-    totals2 = movingmedian(totals, 7)
+    probe = int(np.ceil((lmax/2)*np.arctan(np.radians(angle))))
+    totals = [line_sum(n, img) for n in range(-angle, angle + 1)]
+    totals2 = median_filter(totals, size=3, mode='mirror')
 
     max_index = np.argmax(totals2)
-    if totals2[max_index] / totals[probe] > 1.05:
-        ra = np.arctan((max_index - (probe - 3 + 1)) / (lmax / 2 - 1)) * 180 / np.pi
-    else:
-        ra = 0
+    ra =0
+    # if totals2[max_index] / totals[probe] > 1.05:
+    #     ra = np.arctan((max_index - (probe - 3 + 1)) / (lmax / 2 - 1)) * 180 / np.pi
+    # else:
+    #     ra = 0
     print("Angle of rotation:", ra)
 
     angle_range = np.linspace(-probe, probe, len(totals))
