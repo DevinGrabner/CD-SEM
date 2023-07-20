@@ -144,7 +144,6 @@ class SEMImageDetails:
         ImagTagDict = self._sem_image_tag(file_path, "CZ_SEM")
         # List containing the proper name, value, and dimension
         PixelList = list(ImagTagDict.get("ap_image_pixel_size"))
-        print(PixelList)
 
         # Checks the pixel dimesion and assigns the appropriate scale so the dimensions are in um
         unitConversion = {"pm": 10**-6, "nm": 10**-3, "um": 1}
@@ -179,7 +178,6 @@ class SEMImageDetails:
             # Calculate the dimensions of the scale bar
             image_height = image.shape[0]
             scale_bar_length_pixels = IMAGE_SCALE_UM / (self.pix_size * self.pix_scale)
-            print(scale_bar_length_pixels)
 
             # Calculate the position of the scale bar
             scale_bar_x = image.shape[1] - scale_bar_length_pixels - 100

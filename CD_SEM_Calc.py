@@ -154,6 +154,18 @@ def clip_image(img: np.array) -> np.array:
 
 
 def fourier_pitch(img: object) -> tuple[float, list]:
+    """is a function that takes the 2 D PSD image of an array of straight lines. It is assumed that the diffreaction pattern corresponds to
+    that of an array of straight, mostly vertical lines but that they may be slightly rotated by an angle theta. The function straightens the diffraction patern by rotating it by
+    "-theta" . Then integrates it along qy at every qx pixel. Next it subtracts the background from the I(qx).It then finds the peaks and plots them as qx vs peak order and fits
+    them to a line. The slope is the average qo. From that it calculates a pitch.
+
+    Args:
+        img (object): 2D PSD image
+
+    Returns:
+        tuple[float, list]: pitch of the grating, FFT peak positions with intensity
+    """
+
     def rotate_image(image: np.array, angle: float) -> np.array:
         """Takes the input image and rotates it by the given angle
 
@@ -181,13 +193,15 @@ def fourier_pitch(img: object) -> tuple[float, list]:
     intqwave = np.sum(rotate_image(img.image_FFT, img.image_rotate), axis=0)
 
     # background estimates the background in intqxave so that we can subtract it before identifying peaks
-    background = gaussian_filter1d(intqwave, 5)
+    background = gaussian_filter1d(intqwave, 6)
     newintqwave = intqwave - background
 
-    # peaks will find the peaks in intqxave after background subtraction.
-    # This function may need tweaking if peak detection does not work.
-    # Note that the coordinates are in pixel units
-    peaks = find_peaks(newintqwave, height=4, prominence=0.5, distance=3)
+    # peaks will find the peaks in intqxave after background subtraction. Note that the coordinates are in pixel units
+    peaks = find_peaks(
+        newintqwave,
+        prominence=0.15 * np.max(newintqwave),
+        distance=abs(np.argmax(newintqwave) - len(newintqwave // 2)) // 50,
+    )
 
     # Plotting
     plt.figure(figsize=(10, 6))
@@ -200,12 +214,6 @@ def fourier_pitch(img: object) -> tuple[float, list]:
     plt.legend()
     plt.show()
 
-    # get the peak positions in pixel units centered at lmax/2+1
-    maxposition = np.argmax(intqwave) - int(np.median(peaks[0]))
-    peakpositions = peaks[0] - int(np.median(peaks[0]))
-
-    # rewrite peakpositions in format: {"peak order No., peak position in nm^-1"}
-    # To identify the correct peak order number, we first need to identify the 1st order peak.
     # This could be tricky for DSA samples where the ebeam guiding pattern may show at a lower frequency.
     # Identify the 1st order peak as the peak with the maximum amplitude above the zero frequency and below imax/2.
     # Assuming 'peakpositions' contains the positions of all peaks.
@@ -213,13 +221,22 @@ def fourier_pitch(img: object) -> tuple[float, list]:
 
     # Check if any valid peaks were found
     if np.any(valid_peaks):
+        zero_order = int(np.median(peaks[0]))
+        # To identify the correct peak order number, we first need to identify the 1st order peak.
+        maxposition = np.argmax(intqwave[zero_order : zero_order + lmax // 3])
+        # get the peak positions in pixel units centered at lmax/2+1
+        peakpositions = peaks[0] - int(np.median(peaks[0]))
+        kx = img.kscale * peakpositions
+
+        # Then we normalize all peak relative to the maximum rounded to 0.01 this would leave us room for rounding the peak order numbers
+        # when the density multiplication is greater than 2, even though it may seem strange to have peak order numbers in decimal fractions.
         peakpositions = np.round(peakpositions / maxposition, decimals=2)
-        peakpositions = np.transpose([peakpositions, img.kscale * peakpositions])
+        # rewrite peakpositions in format: {"peak order No., peak position in nm^-1"}
+        peakpositions = np.transpose([peakpositions, kx])
 
         fitslope = np.polyfit(peakpositions[:, 0], peakpositions[:, 1], deg=1)
         slope = fitslope[0]
         intercept = fitslope[1]
-        print(slope, intercept)
 
         # fitpitch = 2 Pi/m /. fitslope
         fitpitch = 2 * np.pi / slope
