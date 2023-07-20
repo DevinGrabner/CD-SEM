@@ -11,7 +11,7 @@ If you would rather do this manually, see the "Optional" section at the end of R
 
   
 # CD-SEM
-Line Roughness Calculation for DSA images.
+Line Roughness Calculation for DSA images. Version 1.0 is as close to a direct port over from Mathematica as possible. Version 2.0(beta) is a complete rework of program functions to include some enhanced Python functionality and improve computation times.
 
 This project is funded by the CHiPPS EFRC at Berkeley National Laboratory.
 
