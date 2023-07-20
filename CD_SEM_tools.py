@@ -11,7 +11,7 @@ def open_window():
     root.focus_force()
 
 
-def rescale_array(arr: np.ndarray, new_min: float, new_max: float) -> np.ndarray:
+def rescale_array(arr: np.array, new_min: float, new_max: float) -> np.array:
     """Rescales the input array between the new_min and new_max values provided
 
     Args:

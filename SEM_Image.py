@@ -33,6 +33,9 @@ class SEMImageDetails:
         self.image_rotate: None | float = (
             None  # The angle the image needs rotated to make sure the FFT is horizontal
         )
+        # Temp
+        self.peakposition: np.array | None = None
+        self.fitpitch: float | None = None
 
         # Images
         self.image = tifffile.imread(self.path)  # Original
@@ -99,6 +102,7 @@ class SEMImageDetails:
         )
         self.image_FFT, self.image_FFT_center = calc.fourier_img(self.image)
         self.image_rotate = calc.rotated_angle(25, self.image_FFT, self.lmax)
+        self.fitpitch, self.peakposition = calc.fourier_pitch(self)
 
     def _sem_image_selector(self) -> str:
         """Lets you select the image file for the object
@@ -126,20 +130,21 @@ class SEMImageDetails:
         return metadata.pages[0].tags[tag_name].value
 
     def _pix_data(self, file_path: str, tag_name: str) -> tuple:
-        """Fetches the data associated with the image pixel dimensions from the library in the header
+        """Fetches the data associated with the image pixel dimensions from the library in the header. The multiplication of pixel scale and pixel size puts the pixel size in micrometers
 
         Args:
             file_path (str): file path to the image
             tag_name (str): Name of the tag in the header we want the associated value for.
 
         Returns:
-            tuple: [pixel_name, pixel_size, pixel_dimension]
+            tuple: [pixel_scale, pixel_size, pixel_dimension]
         """
         global PIX_SIZE
 
         ImagTagDict = self._sem_image_tag(file_path, "CZ_SEM")
         # List containing the proper name, value, and dimension
         PixelList = list(ImagTagDict.get("ap_image_pixel_size"))
+        print(PixelList)
 
         # Checks the pixel dimesion and assigns the appropriate scale so the dimensions are in um
         unitConversion = {"pm": 10**-6, "nm": 10**-3, "um": 1}
@@ -173,7 +178,8 @@ class SEMImageDetails:
         if bar:
             # Calculate the dimensions of the scale bar
             image_height = image.shape[0]
-            scale_bar_length_pixels = (IMAGE_SCALE_UM * self.pix_scale) / self.pix_size
+            scale_bar_length_pixels = IMAGE_SCALE_UM / (self.pix_size * self.pix_scale)
+            print(scale_bar_length_pixels)
 
             # Calculate the position of the scale bar
             scale_bar_x = image.shape[1] - scale_bar_length_pixels - 100
@@ -204,7 +210,7 @@ class SEMImageDetails:
         # Show the plot
         plt.show()
 
-    def display_fft_image(self: object, fimg: np.ndarray) -> None:
+    def display_fft_image(self: object, fimg: np.array) -> None:
         """Displays the scaled FFT image on a colorblind friendly colorbar
 
         Args:
