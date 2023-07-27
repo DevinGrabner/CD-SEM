@@ -1,5 +1,6 @@
 import CD_SEM_tools as tools
-import CD_SEM_Calc as calc
+import CD_SEM_FFT as FFTcalc
+import CD_SEM_edges as lines
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import LinearSegmentedColormap
@@ -96,26 +97,36 @@ class SEMImageDetails:
         self.BLPA_inline: None | float = None  # nm # In Line
 
     def __call__(self):
-        self.imax, self.lmax, self.kscale = calc.image_size(
+
+        # These operations have to deal with extracting information from the original SEM image, rotating it if it is tilted, and applying a frequency filter
+        self.imax, self.lmax, self.kscale = FFTcalc.image_size(
             self.height, self.pix_scale, self.pix_size
         )
-        self.image_clipped = tools.clip_image(calc.extract_center_part(self.image, self.lmax))
-        self.display_SEM_image(self.image_clipped, bar=True, title="Clipped SEM Image")
+        self.image_clipped = tools.clip_image(FFTcalc.extract_center_part(self.image, self.lmax))
+###        self.display_SEM_image(self.image_clipped, bar=True, title="Clipped SEM Image")
         
-        self.image_PDS, self.image_PDS_center = calc.PDS_img(self.image_clipped)
-        self.display_fft_image(self.image_PDS, title="Power Spectral Density")
+        self.image_PDS, self.image_PDS_center = FFTcalc.PDS_img(self.image_clipped)
+###        self.display_fft_image(self.image_PDS, title="Power Spectral Density")
 
-        self.image_rotate = calc.rotated_angle(25, self.image_PDS, self.lmax)
+        self.image_rotate = FFTcalc.rotated_angle(25, self.image_PDS, self.lmax)
 
         if self.image_rotate > 0:
             self.image_clipped = tools.rotate_image(self.image_clipped, self.image_rotate)
             self.image_PDS = tools.rotate_image(self.image_PDS, self.image_rotate)
         
         self.image_FFT = fftshift(fft2(self.image_clipped))
-        self.fitpitch = calc.fourier_pitch(self)
+        self.fitpitch = FFTcalc.fourier_pitch(self)
 
-        self.image_flat = calc.filter_img(self)
-        self.display_SEM_image(self.image_flat, bar=True, title="Filtered SEM Image")
+        self.image_flat = FFTcalc.filter_img(self)
+###        self.display_SEM_image(self.image_flat, bar=True, title="Filtered SEM Image")
+
+        # These operations have to deal with threasholding, binary filter, and finding line edges
+
+        # These operations have to deal with LER, LWR, LPR
+
+        # These operations have to deal with statistical line analysis
+
+        # These operations have to deal with frequency domain analysis
 
     def _sem_image_selector(self) -> str:
         """Lets you select the image file for the object
@@ -190,11 +201,11 @@ class SEMImageDetails:
 
         if bar:
             global IMAGE_SCALE_UM
-            # Calculate the dimensions of the scale bar
+            # calculate the dimensions of the scale bar
             image_height = image.shape[0]
             scale_bar_length_pixels = IMAGE_SCALE_UM / (self.pix_size * self.pix_scale)
 
-            # Calculate the position of the scale bar
+            # calculate the position of the scale bar
             scale_bar_x = image.shape[1] - scale_bar_length_pixels - 100
             scale_bar_y = image_height - 50
 
