@@ -100,10 +100,10 @@ class SEMImageDetails:
             self.height, self.pix_scale, self.pix_size
         )
         self.image_clipped = tools.clip_image(calc.extract_center_part(self.image, self.lmax))
-        self.display_SEM_image(self.image_clipped, bar=True)
+        self.display_SEM_image(self.image_clipped, bar=True, title="Clipped SEM Image")
         
         self.image_PDS, self.image_PDS_center = calc.PDS_img(self.image_clipped)
-        self.display_fft_image(self.image_PDS)
+        self.display_fft_image(self.image_PDS, title="Power Spectral Density")
 
         self.image_rotate = calc.rotated_angle(25, self.image_PDS, self.lmax)
 
@@ -112,12 +112,10 @@ class SEMImageDetails:
             self.image_PDS = tools.rotate_image(self.image_PDS, self.image_rotate)
         
         self.image_FFT = fftshift(fft2(self.image_clipped))
-        self.display_fft_image(np.real(self.image_FFT))
-
         self.fitpitch = calc.fourier_pitch(self)
 
         self.image_flat = calc.filter_img(self)
-        self.display_SEM_image(self.image_flat, bar=True)
+        self.display_SEM_image(self.image_flat, bar=True, title="Filtered SEM Image")
 
     def _sem_image_selector(self) -> str:
         """Lets you select the image file for the object
@@ -176,20 +174,22 @@ class SEMImageDetails:
         PixelList[0] = unitConversion.get(PixelList[2])
         return PixelList
 
-    def display_SEM_image(self: object, image: tifffile, bar=False) -> None:
+    def display_SEM_image(self: object, image: tifffile, title=None, bar=False) -> None:
         """Displays an image with scale bar (if wanted) based on pixel size from the image
 
         Args:
             image (np.ndarray): image that you want displayed
+            title (string): Title of the image if wanted
             bar (bool, optional): Option to display scale bar on image. Defaults to False.
         """
-        global IMAGE_SCALE_UM
 
         # Plot the image
         plt.imshow(image, cmap="gray")
+        plt.title(title)
         plt.axis("off")
 
         if bar:
+            global IMAGE_SCALE_UM
             # Calculate the dimensions of the scale bar
             image_height = image.shape[0]
             scale_bar_length_pixels = IMAGE_SCALE_UM / (self.pix_size * self.pix_scale)
@@ -223,11 +223,12 @@ class SEMImageDetails:
         # Show the plot
         plt.show()
 
-    def display_fft_image(self: object, fimg: np.array) -> None:
+    def display_fft_image(self: object, fimg: np.array, title=None) -> None:
         """Displays the scaled FFT image on a colorblind friendly colorbar
 
         Args:
             fimg (np.ndarray): FFT image getting displayed
+            title (string): Title of the image if wanted
         """
         # Define a colorblind-friendly colormap
         cmap = LinearSegmentedColormap.from_list(
@@ -237,6 +238,6 @@ class SEMImageDetails:
         # Plot the FFT image
         plt.imshow(fimg, cmap=cmap)
         plt.colorbar(label="Intensity")
-        plt.title("FFT Image")
+        plt.title(title)
         plt.axis("off")
         plt.show()

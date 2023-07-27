@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from scipy.ndimage import gaussian_filter1d
-from scipy.fftpack import fftshift, fft2, ifft2
+from scipy.fftpack import fftshift, fft2, ifft2, ifftshift
 
 
 def image_size(
@@ -169,6 +169,7 @@ def fourier_pitch(img: object) -> float:
     plt.xlabel("pixel")
     plt.ylabel("Intensity")
     plt.legend()
+    plt.title("Frequency Spectrum")
     plt.show()
 
     # This could be tricky for DSA samples where the ebeam guiding pattern may show at a lower frequency.
@@ -248,17 +249,12 @@ def disk_filter(r1: float, r2: float, imsize: float) -> np.array:
     filter = np.zeros((imsize, imsize), dtype=int)
 
     # Mark regions as pass or block based on radial assignments
-    filter[r <= 0] = 1  # Zero frequency (pass)
-    filter[(0 < r) & (r <= r1)] = 0  # Low frequencies (block)
+    filter[(r <= r1)] = 0  # Low frequencies (block)
     filter[(r1 < r) & (r < r2)] = 1  # Mid frequencies (pass)
     filter[r >= r2] = 0  # High frequencies (block)
 
     # Ensure the center (zero frequency) remains as pass
     filter[xo, yo] = 1
-
-    plt.imshow(filter, cmap="gray")
-    plt.legend()
-    plt.show()
 
     return filter
 
@@ -277,8 +273,8 @@ def filter_img(img: object) -> np.array:
     fHigh = 1 + (0.9 * img.lmax / 2)
 
     # Applies a frequency filter to the FFT
-    filteredImage = img.image_clipped * disk_filter(fLow, fHigh, img.lmax)
+    filteredImage = img.image_FFT * disk_filter(fLow, fHigh, img.lmax)
     # Preforms the inverse Fourier transform to the filtered FFT
-    filteredImage = np.real(ifft2(filteredImage))
+    filteredImage = ifft2(ifftshift(filteredImage)).real
 
     return tools.clip_image(filteredImage)

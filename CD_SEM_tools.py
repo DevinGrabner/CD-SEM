@@ -28,7 +28,7 @@ def rescale_array(arr: np.array, new_min: float, new_max: float) -> np.array:
     max_val = np.max(arr)
     scaled_arr = (np.copy(arr) - min_val) / (
         max_val - min_val
-    )  # Scale values between 0 and 1
+    )  # Scale values between new_min and new_max
     rescaled_arr = (
         scaled_arr * (new_max - new_min) + new_min
     )  # Rescale to the new range
