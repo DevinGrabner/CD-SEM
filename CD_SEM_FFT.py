@@ -61,7 +61,7 @@ def PDS_img(img: np.array) -> tuple[np.array, float]:
     center = np.array(fimg.shape) // 2
     ctrval = fimg[center, center]
     fimg = np.log(fimg)
-    fimg = tools.rescale_array(fimg,0,1)
+    fimg = tools.rescale_array(fimg, 0, 1)
     fimg[center, center] = 1
     return fimg, ctrval
 
@@ -113,7 +113,7 @@ def rotated_angle(probe: int, img: np.array, lmax: int) -> float:
 
     angle_range = np.linspace(-probe, probe, len(totals))
     angle_range_plusminus3 = np.linspace(-probe + 3, probe - 3, len(totals2))
-
+    """
     plt.plot(angle_range, totals, marker="o", linestyle="-", label="Totals")
     plt.plot(angle_range_plusminus3, totals2, label="Moving Median")
 
@@ -126,7 +126,7 @@ def rotated_angle(probe: int, img: np.array, lmax: int) -> float:
     )  # Add vertical line at ra
 
     plt.show()
-
+    """
     return ra
 
 
@@ -159,7 +159,7 @@ def fourier_pitch(img: object) -> float:
         prominence=0.15 * np.max(newintqwave),
         distance=abs(np.argmax(newintqwave) - len(newintqwave // 2)) // 50,
     )
-
+    """
     # Plotting
     plt.figure(figsize=(10, 6))
     plt.plot(intqwave, label="data")
@@ -171,6 +171,7 @@ def fourier_pitch(img: object) -> float:
     plt.legend()
     plt.title("Frequency Spectrum")
     plt.show()
+    """
 
     # This could be tricky for DSA samples where the ebeam guiding pattern may show at a lower frequency.
     # Identify the 1st order peak as the peak with the maximum amplitude above the zero frequency and below imax/2.
@@ -198,7 +199,7 @@ def fourier_pitch(img: object) -> float:
 
         # fitpitch = 2 Pi/m /. fitslope
         fitpitch = 2 * np.pi / slope
-
+        """
         # Plotting
         plt.figure(figsize=(8, 6))
         plt.plot(
@@ -216,7 +217,7 @@ def fourier_pitch(img: object) -> float:
         plt.title(f"L0 = {round(fitpitch, 2)} nm")
         plt.legend()
         plt.show()
-
+        """
         return fitpitch
     else:
         raise ValueError(

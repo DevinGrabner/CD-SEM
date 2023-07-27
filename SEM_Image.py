@@ -1,6 +1,9 @@
 import CD_SEM_tools as tools
 import CD_SEM_FFT as FFTcalc
-import CD_SEM_edges as lines
+import CD_SEM_edges as edges
+
+# import CD_SEM_ruffness as ruff
+# import CD_SEM_analysis as anlys
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import LinearSegmentedColormap
@@ -14,7 +17,7 @@ TAG_NAMES: Final[list[str]] = ["ImageWidth", "ImageLength", "CZ_SEM"]
 PIX_SIZE: Final[str] = "ap_image_pixel_size"
 IMAGE_SCALE_UM: Final[float] = 0.2  # Image scale bar length in micrometers
 
-######### This object holds 54 properties from CD-SEM analyis. It only auto initializes values pulled directly from the header file of the '.fit' SEM image.
+######### This object holds ?? properties from CD-SEM analyis. It only auto initializes values pulled directly from the header file of the '.fit' SEM image.
 ######### The __call__ function will run all the necassary calculations to assign values to all object properties
 
 
@@ -36,91 +39,50 @@ class SEMImageDetails:
         self.image_rotate: None | float = (
             None  # The angle the image needs rotated to make sure the FFT is horizontal
         )
-        # Temp
         self.peakposition: np.array | None = None
+        self.midlevel: float | None = None
 
         # Images
         self.image = tifffile.imread(self.path)  # Original
         self.image_clipped = None  # Clipped image used for FFT analysis
         self.image_FFT = None  # Fourier Transform of clipped image
-        self.image_PDS = None # log of the power spectral density of the Fourier image
+        self.image_PDS = None  # log of the power spectral density of the Fourier image
         self.image_flat = None  # Flattened image
         self.image_binary = None  # Black and White Binary image
-        self.image_color = None  # Colorized image
-        self.image_pintched = None  # Pintched Color image
-
-        # These are all of the variable that we need at the end of the analysis
-        # Line Edge Roughness  -  LER
-        self.LER_edges: None | int = None  # Number of measured edges
-        self.LER_wave_low: None | float = None  # nm # Cutoff Wavelengths
-        self.LER_wave_high: None | float = None
-        self.LER_median: None | float = None  # nm # Median LER 3*sigma
-        self.LER_range_low: None | float = None  # nm # LER 3*sigma range
-        self.LER_range_high: None | float = None
-
-        # White Line Width Roughness  -  WLWR
-        self.WLWR_lines: None | int = None  # Number of measured lines
-        self.WLWR_avg_width: None | float = None  # nm # Average Line Width
-        self.WLWR_LDC: None | float = None  # Line Duty Cycle
-        self.WLWR_median: None | float = None  # nm # Median LWR 3*sigma
-        self.WLWR_lin_corr: None | float = None  # Median Lin. corr. coeff. (c_white)
-        self.WLWR_range_low: None | float = None  # c_white range
-        self.WLWR_range_high: None | float = None
-
-        # White Line Placement Accuracy
-        self.WLPA_lines: None | int = None  # Number of measured lines
-        self.WLPA_place: None | float = None  # nm # Placement Roughness 3*sigma
-        self.WLPA_place_low: None | float = None  # nm # Placement 3*sigma range
-        self.WLPA_place_high: None | float = None
-        self.WLPA_crossline_L: None | float = None  # nm # Cross Line L_o
-        self.WLPA_crossline_A: None | float = None  # nm # Cross Line A_o
-        self.WLPA_inline: None | float = None  # nm # In Line
-        self.WLPA_pitch: None | float = None  # nm # Pitch Lo
-        self.WLPA_pitch_walk: None | float = None  # nm # Pitch Walking * Pitch Lo
-
-        # Black Line Width Roughness
-        self.BLWR_lines: None | int = None  # Number of measured lines
-        self.BLWR_avg_width: None | float = None  # nm # Average Line Width
-        self.BLWR_LDC: None | float = None  # Line Duty Cycle
-        self.BLWR_median: None | float = None  # nm # Median LWR 3*sigma
-        self.BLWR_lin_corr: None | float = None  # Median Lin. corr. coeff. (c_black)
-        self.BLWR_range_low: None | float = None  # c_black range
-        self.BLWR_range_high: None | float = None
-
-        # Black Line Placement Accuracy
-        self.BLPA_lines: None | int = None  # Number of measured lines
-        self.BLPA_place: None | float = None  # nm # Placement Roughness 3*sigma
-        self.BLPA_place_low: None | float = None  # nm # Placement 3*sigma range
-        self.BLPA_place_high: None | float = None
-        self.BLPA_crossline_L: None | float = None  # nm # Cross Line L_o
-        self.BLPA_crossline_A: None | float = None  # nm # Cross Line A_o
-        self.BLPA_inline: None | float = None  # nm # In Line
+        self.image_boundaries = None  # Binary Boundary image
 
     def __call__(self):
-
         # These operations have to deal with extracting information from the original SEM image, rotating it if it is tilted, and applying a frequency filter
         self.imax, self.lmax, self.kscale = FFTcalc.image_size(
             self.height, self.pix_scale, self.pix_size
         )
-        self.image_clipped = tools.clip_image(FFTcalc.extract_center_part(self.image, self.lmax))
-###        self.display_SEM_image(self.image_clipped, bar=True, title="Clipped SEM Image")
-        
+        self.image_clipped = tools.clip_image(
+            FFTcalc.extract_center_part(self.image, self.lmax)
+        )
+        ###        self.display_SEM_image(self.image_clipped, bar=True, title="Clipped SEM Image")
+
         self.image_PDS, self.image_PDS_center = FFTcalc.PDS_img(self.image_clipped)
-###        self.display_fft_image(self.image_PDS, title="Power Spectral Density")
+        ###        self.display_fft_image(self.image_PDS, title="Power Spectral Density")
 
         self.image_rotate = FFTcalc.rotated_angle(25, self.image_PDS, self.lmax)
 
         if self.image_rotate > 0:
-            self.image_clipped = tools.rotate_image(self.image_clipped, self.image_rotate)
+            self.image_clipped = tools.rotate_image(
+                self.image_clipped, self.image_rotate
+            )
             self.image_PDS = tools.rotate_image(self.image_PDS, self.image_rotate)
-        
+
         self.image_FFT = fftshift(fft2(self.image_clipped))
         self.fitpitch = FFTcalc.fourier_pitch(self)
 
         self.image_flat = FFTcalc.filter_img(self)
-###        self.display_SEM_image(self.image_flat, bar=True, title="Filtered SEM Image")
+
+        ###        self.display_SEM_image(self.image_flat, bar=True, title="Filtered SEM Image")
 
         # These operations have to deal with threasholding, binary filter, and finding line edges
+        self.midlevel = edges.threshold_level(self.image_flat, 0.6)
+        self.image_binary = edges.blackwhite_image(self.image_flat, self.midlevel)
+        self.image_boundaries = edges.boundary_image(self.image_binary)
 
         # These operations have to deal with LER, LWR, LPR
 

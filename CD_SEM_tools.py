@@ -67,3 +67,24 @@ def rotate_image(image: np.array, angle: float) -> np.array:
     transformed_image = transform.warp(np.copy(image), inverse_map=transform_matrix)
 
     return transformed_image
+
+
+def pad_vector_to_match_length(vector: np.array, target_vector: np.array) -> np.array:
+    """Takes a vector and evenly added zeros to either end until it is the same
+        length as the 'taget_vector'
+
+    Args:
+        vector (np.array): vector that needs padded
+        target_vector (np.array): longer vector with the target length
+
+    Returns:
+        np.array: input vector padded with zeros
+    """
+    target_length = len(target_vector)
+    current_length = len(vector)
+
+    difference = target_length - current_length
+    pad_before = difference // 2
+    pad_after = difference - pad_before
+
+    return np.pad(vector, (pad_before, pad_after), mode="constant", constant_values=0)
