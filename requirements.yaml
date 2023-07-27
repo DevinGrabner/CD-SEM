@@ -10,3 +10,4 @@ dependencies:
   - tifffile
   - typing
   - scikit-image
+  - opencv-python

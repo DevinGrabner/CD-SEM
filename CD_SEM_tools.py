@@ -1,6 +1,7 @@
 import tkinter as tk
 import numpy as np
 from skimage import transform
+import matplotlib.pyplot as plt
 from scipy.stats import scoreatpercentile
 
 
@@ -88,3 +89,19 @@ def pad_vector_to_match_length(vector: np.array, target_vector: np.array) -> np.
     pad_after = difference - pad_before
 
     return np.pad(vector, (pad_before, pad_after), mode="constant", constant_values=0)
+
+
+def simple_image_display(img: np.array, title: str) -> None:
+    """Simple display of an np.array with a title
+
+    Args:
+        img (np.array): Array to display
+        title (str): Title of image
+    """
+    # Display the original binary image and the edges
+    plt.figure(figsize=(10, 10))
+    plt.imshow(img, cmap="gray")
+    plt.title(title)
+    plt.colorbar()
+    plt.axis("off")
+    plt.show()

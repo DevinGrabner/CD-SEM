@@ -41,6 +41,7 @@ class SEMImageDetails:
         )
         self.peakposition: np.array | None = None
         self.midlevel: float | None = None
+        self.boundaries: dict | None = None
 
         # Images
         self.image = tifffile.imread(self.path)  # Original
@@ -83,6 +84,8 @@ class SEMImageDetails:
         self.midlevel = edges.threshold_level(self.image_flat, 0.6)
         self.image_binary = edges.blackwhite_image(self.image_flat, self.midlevel)
         self.image_boundaries = edges.boundary_image(self.image_binary)
+        self.boundaries = edges.boundary_lines(self.image_boundaries)
+        edges.boundary_edges_rotate(self.image_boundaries, self.boundaries)
 
         # These operations have to deal with LER, LWR, LPR
 
