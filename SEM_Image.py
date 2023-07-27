@@ -3,6 +3,7 @@ import CD_SEM_Calc as calc
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import LinearSegmentedColormap
+from scipy.fftpack import fftshift, fft2
 import numpy as np
 import tifffile
 from tkinter import filedialog
@@ -27,20 +28,21 @@ class SEMImageDetails:
         self.imax: int | None = None  # See ImgFlat.lmax for details on variables
         self.lmax: int | None = None
         self.kscale: float | None = None
-        self.image_FFT_center: None | float = (
-            None  # Magnitude square of the zero frequency of the FFT image
+        self.fitpitch: float | None = None
+        self.image_PDS_center: None | float = (
+            None  # PDS of the zero frequency of the FFT image
         )
         self.image_rotate: None | float = (
             None  # The angle the image needs rotated to make sure the FFT is horizontal
         )
         # Temp
         self.peakposition: np.array | None = None
-        self.fitpitch: float | None = None
 
         # Images
         self.image = tifffile.imread(self.path)  # Original
         self.image_clipped = None  # Clipped image used for FFT analysis
-        self.image_FFT = None  # log of Fourier image
+        self.image_FFT = None  # Fourier Transform of clipped image
+        self.image_PDS = None # log of the power spectral density of the Fourier image
         self.image_flat = None  # Flattened image
         self.image_binary = None  # Black and White Binary image
         self.image_color = None  # Colorized image
@@ -97,12 +99,25 @@ class SEMImageDetails:
         self.imax, self.lmax, self.kscale = calc.image_size(
             self.height, self.pix_scale, self.pix_size
         )
-        self.image = tools.rescale_array(
-            calc.extract_center_part(self.image, self.lmax), 0, 1
-        )
-        self.image_FFT, self.image_FFT_center = calc.fourier_img(self.image)
-        self.image_rotate = calc.rotated_angle(25, self.image_FFT, self.lmax)
-        self.fitpitch, self.peakposition = calc.fourier_pitch(self)
+        self.image_clipped = tools.clip_image(calc.extract_center_part(self.image, self.lmax))
+        self.display_SEM_image(self.image_clipped, bar=True)
+        
+        self.image_PDS, self.image_PDS_center = calc.PDS_img(self.image_clipped)
+        self.display_fft_image(self.image_PDS)
+
+        self.image_rotate = calc.rotated_angle(25, self.image_PDS, self.lmax)
+
+        if self.image_rotate > 0:
+            self.image_clipped = tools.rotate_image(self.image_clipped, self.image_rotate)
+            self.image_PDS = tools.rotate_image(self.image_PDS, self.image_rotate)
+        
+        self.image_FFT = fftshift(fft2(self.image_clipped))
+        self.display_fft_image(np.real(self.image_FFT))
+
+        self.fitpitch = calc.fourier_pitch(self)
+
+        self.image_flat = calc.filter_img(self)
+        self.display_SEM_image(self.image_flat, bar=True)
 
     def _sem_image_selector(self) -> str:
         """Lets you select the image file for the object

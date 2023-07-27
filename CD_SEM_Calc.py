@@ -1,18 +1,9 @@
 import CD_SEM_tools as tools
 import numpy as np
 import matplotlib.pyplot as plt
-from skimage import transform
 from scipy.signal import find_peaks
-from scipy.optimize import curve_fit
 from scipy.ndimage import gaussian_filter1d
-from scipy.fftpack import fftshift, fft2  # , ifft2
-
-# from scipy.ndimage import gaussian_filter, morphology
-from scipy.stats import scoreatpercentile
-
-# from scipy.ndimage.measurements import label
-# from scipy.optimize import curve_fit
-# import matplotlib.pyplot as plt
+from scipy.fftpack import fftshift, fft2, ifft2
 
 
 def image_size(
@@ -54,7 +45,7 @@ def extract_center_part(img: np.array, size: int) -> np.array:
     return img[roi_h : int(roi_h + size), roi_w : int(roi_w + size)]
 
 
-def fourier_img(img: np.array) -> tuple[np.array, float]:
+def PDS_img(img: np.array) -> tuple[np.array, float]:
     """Calculates the magnitude squared of the Fourier Transform of a square image "img" of size "lmax".
     It recenters it so that the zero frequency is at {lmax/2+1, lmax/2+1}. It saves the magnitude square
     of the zero frequency in a variable called "ctrval". The zero frequncy in the image is replaced by "1" to help
@@ -66,10 +57,11 @@ def fourier_img(img: np.array) -> tuple[np.array, float]:
     Returns:
         tuple[np.ndarray, float]: FFT image, Magnitude square of the zero frequency
     """
-    fimg = np.abs(fftshift(fft2(np.copy(img)))) ** 2
+    fimg = fftshift((np.abs(fft2(img))) ** 2)
     center = np.array(fimg.shape) // 2
-    fimg = tools.rescale_array(np.log(fimg), 0, 1)
     ctrval = fimg[center, center]
+    fimg = np.log(fimg)
+    fimg = tools.rescale_array(fimg,0,1)
     fimg[center, center] = 1
     return fimg, ctrval
 
@@ -138,22 +130,7 @@ def rotated_angle(probe: int, img: np.array, lmax: int) -> float:
     return ra
 
 
-def clip_image(img: np.array) -> np.array:
-    """Takes the input image and clips it between 0.05% and 99.95% of it origonal values.
-    The clipped image is then rescaled between 0 and 1
-
-    Args:
-        img (np.ndarray): The 2D array that makes up the SEM image
-
-    Returns:
-        np.array: clipped and rescale image
-    """
-    xlow = scoreatpercentile(img, 0.05)
-    xhigh = scoreatpercentile(img, 99.95)
-    return tools.rescale_array(np.clip(np.copy(img), xlow, xhigh), 0.0, 1.0)
-
-
-def fourier_pitch(img: object) -> tuple[float, list]:
+def fourier_pitch(img: object) -> float:
     """is a function that takes the 2 D PSD image of an array of straight lines. It is assumed that the diffreaction pattern corresponds to
     that of an array of straight, mostly vertical lines but that they may be slightly rotated by an angle theta. The function straightens the diffraction patern by rotating it by
     "-theta" . Then integrates it along qy at every qx pixel. Next it subtracts the background from the I(qx).It then finds the peaks and plots them as qx vs peak order and fits
@@ -165,32 +142,12 @@ def fourier_pitch(img: object) -> tuple[float, list]:
     Returns:
         tuple[float, list]: pitch of the grating, FFT peak positions with intensity
     """
-
-    def rotate_image(image: np.array, angle: float) -> np.array:
-        """Takes the input image and rotates it by the given angle
-
-        Args:
-            image (np.array): 2D PSD image
-            angle (float): angle of needed rotation given by def rotate_angle()
-
-        Returns:
-            np.array: rotated 2D PSD image
-        """
-        # Define the transformation function for rotation
-        transform_matrix = transform.AffineTransform(rotation=np.deg2rad(angle))
-
-        # Perform the image transformation
-        transformed_image = transform.warp(image, inverse_map=transform_matrix)
-
-        return transformed_image
-
     lmax = img.lmax
     imax = img.imax
 
-    # intqxave takes the image img and rotates it an angle theta to straighten it up.
     # At this point, it is assumed that the Fourier peaks are all vertical at fixed qx along qy.
     # The function adds up all of the columns -- integrates along qy for each qx
-    intqwave = np.sum(rotate_image(img.image_FFT, img.image_rotate), axis=0)
+    intqwave = np.sum(img.image_PDS, axis=0)
 
     # background estimates the background in intqxave so that we can subtract it before identifying peaks
     background = gaussian_filter1d(intqwave, 6)
@@ -259,8 +216,69 @@ def fourier_pitch(img: object) -> tuple[float, list]:
         plt.legend()
         plt.show()
 
-        return [fitpitch, peaks]
+        return fitpitch
     else:
         raise ValueError(
             "No valid peaks were found or incorrect data for peak detection."
         )
+
+
+def disk_filter(r1: float, r2: float, imsize: float) -> np.array:
+    """DiskFilter makes a bandpass filter in a square matrix of size "imsize" . The filter is an array of 1' s and 0' s.
+    The position where there is a "1" mean that those frequencies will "pass" and where there is a "zero" frequencies will be "blocked".
+    In the disk filter the array of 1' s and 0' s follows the radial assignment r1 and r2.
+
+    Args:
+        r1 (float): radial assingment for Low frequency filter
+        r2 (float): radial assingment for High frequency filter
+        imsize (float): _description_
+
+    Returns:
+        np.array: _description_
+    """
+    # Create a mesh grid to represent the Cartesian coordinates
+    x, y = np.meshgrid(range(imsize), range(imsize))
+    xo = imsize // 2 + 1
+    yo = imsize // 2 + 1
+
+    # Convert the Cartesian coordinates to polar coordinates
+    r = np.sqrt((x - xo) ** 2 + (y - yo) ** 2)
+
+    # Create the disk filter
+    filter = np.zeros((imsize, imsize), dtype=int)
+
+    # Mark regions as pass or block based on radial assignments
+    filter[r <= 0] = 1  # Zero frequency (pass)
+    filter[(0 < r) & (r <= r1)] = 0  # Low frequencies (block)
+    filter[(r1 < r) & (r < r2)] = 1  # Mid frequencies (pass)
+    filter[r >= r2] = 0  # High frequencies (block)
+
+    # Ensure the center (zero frequency) remains as pass
+    filter[xo, yo] = 1
+
+    plt.imshow(filter, cmap="gray")
+    plt.legend()
+    plt.show()
+
+    return filter
+
+
+def filter_img(img: object) -> np.array:
+    """_summary_
+
+    Args:
+        img (object): _description_
+
+    Returns:
+        np.array: _description_
+    """
+    # Sets the low and high frequency cutoffs
+    fLow = 0.3 * 2 * np.pi / img.fitpitch / img.kscale
+    fHigh = 1 + (0.9 * img.lmax / 2)
+
+    # Applies a frequency filter to the FFT
+    filteredImage = img.image_clipped * disk_filter(fLow, fHigh, img.lmax)
+    # Preforms the inverse Fourier transform to the filtered FFT
+    filteredImage = np.real(ifft2(filteredImage))
+
+    return tools.clip_image(filteredImage)
