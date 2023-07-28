@@ -85,7 +85,7 @@ def blackwhite_image(img: np.array, midlevel: float) -> np.array:
     # bw_image[20:31, 550:601] = 1
 
     # Display the result
-    #tools.simple_image_display(bw_image, "Binary SEM Image")
+    # tools.simple_image_display(bw_image, "Binary SEM Image")
 
     return bw_image
 
@@ -117,14 +117,14 @@ def boundary_lines(boundary_img: np.array) -> dict:
     Returns:
         dict: Dictionary containing a mapping of each labeled line (connected component) to a list of its corresponding pixel coordinates
     """
-    labeled_array, num_labels = label(boundary_img, connectivity=2, return_num=True)
+    num_labels = np.amax(boundary_img)
     lines = {f"Line {i + 1}": [] for i in range(num_labels)}
 
-    for region in regionprops(labeled_array):
+    for region in regionprops(boundary_img):
         for pixel in region.coords:
-            line_label = labeled_array[pixel[0], pixel[1]]
+            line_label = boundary_img[pixel[0], pixel[1]]
             lines[f"Line {line_label}"].append((pixel[0], pixel[1]))
-    
+
     # Zero out lines with pixels at column 0 or column image width
     image_width = boundary_img.shape[1]
     for line_label, pixels in lines.items():
@@ -134,17 +134,18 @@ def boundary_lines(boundary_img: np.array) -> dict:
         if first_pixel_col == 0 or last_pixel_col == image_width - 1:
             for pixel in pixels:
                 boundary_img[pixel[0], pixel[1]] = 0
-
-    tools.simple_image_display(boundary_img, "Trimmed Line Boundaries")
     return lines
 
 
-def calculate_rotation_angle(points):
-    # # Fit a line to the points using linear regression
-    # x, y = zip(*(point[:2] for point in points))
-    # x = np.array(x)  # Convert x to a flat NumPy array
-    # y = np.array(y)  # Convert y to a flat NumPy array
+def calculate_rotation_angle(points: list) -> float:
+    """Fits a linear line the input boundary edge and calculates the tilt angle
 
+    Args:
+        points (list): All (x,y) points that make up the boundary edge line
+
+    Returns:
+        float: angle in degree the line need to rotate
+    """
     # Convert the points list to a NumPy array
     points_array = np.array(points)
 
@@ -161,56 +162,58 @@ def calculate_rotation_angle(points):
 
     return angle_deg
 
-def apply_rotation(image, pixels, angle_deg):
+
+def apply_rotation(image: np.array, angle_deg: float) -> np.array:
+    """Rotates the input image by the input angle around (0,0)
+
+    Args:
+        image (np.array): image to rotate
+        angle_deg (float): angle to rotate the image to
+
+    Returns:
+        np.array: rotated image
+    """
     # Apply rotation to the image and pixel coordinates
     rows, cols = image.shape
     rotated_image = np.zeros_like(image)
+    pixels = [(x, y) for x, y in np.argwhere(image)]
     for pixel in pixels:
         x, y = pixel
-        x_rot = int(x * np.cos(np.radians(angle_deg)) - y * np.sin(np.radians(angle_deg)))
-        y_rot = int(x * np.sin(np.radians(angle_deg)) + y * np.cos(np.radians(angle_deg)))
+        x_rot = int(
+            x * np.cos(np.radians(angle_deg)) - y * np.sin(np.radians(angle_deg))
+        )
+        y_rot = int(
+            x * np.sin(np.radians(angle_deg)) + y * np.cos(np.radians(angle_deg))
+        )
         if 0 <= x_rot < rows and 0 <= y_rot < cols:
             rotated_image[x_rot, y_rot] = image[x, y]
 
     return rotated_image
 
-def boundary_edges_rotate(boundary_edges, lines):
 
+def boundary_edges_rotate(boundary_img: np.array, lines: dict) -> np.array:
+    """Parent fuction to conduct an image rotation of the boundary edge image
+
+    Args:
+        boundary_img (np.array): image that needs rotated
+        lines (dict): dictionary of the labeled boundary edge lines. Keywork "Line #": Value(List of points that make up the line)
+
+    Returns:
+        np.array: Rotated image
+    """
     # Calculate the average rotation angle for each line
-    rotation_angles = [calculate_rotation_angle(lines[f"Line {line_label}"]) for line_label in range(1, len(lines)+1)]
-        
+    rotation_angles = [
+        calculate_rotation_angle(lines[f"Line {line_label}"])
+        for line_label in range(1, len(lines) + 1)
+    ]
 
     # Calculate the average rotation angle for all lines
     avg_rotation_angle = np.mean(rotation_angles)
+    print(avg_rotation_angle)
 
     # Apply rotation to the binary_array and all the lines' pixel coordinates
-    binary_array_rotated = apply_rotation(boundary_edges, [(x, y) for x, y in np.argwhere(boundary_edges)], avg_rotation_angle)
+    binary_array_rotated = apply_rotation(
+        boundary_img, avg_rotation_angle
+    )
 
-    tools.simple_image_display(binary_array_rotated, "rotated")
-
-    # Apply rotation to all the lines
-    rotated_lines = {line_label: apply_rotation(boundary_edges, pixels, avg_rotation_angle) for line_label, pixels in lines.items()}
-
-    if check_matching_lines(binary_array_rotated, lines, rotated_lines):
-        return binary_array_rotated, rotated_lines
-    else:
-        raise ValueError(
-            "Some pixels in the lines were modified during the rotation."
-        )
-
-
-def check_matching_lines(rotated_image, lines, lines_rotated):
-        # Subtract all the rotated lines from the original image
-        subtracted_image = rotated_image.copy()
-        for line_label, pixels in lines_rotated.items():
-            # Convert pixels list to a NumPy array and reshape it to match the shape of lines[line_label]
-            pixels_array = np.array(pixels)
-            pixels_array = pixels_array.reshape((-1,2))
-
-            # Perform the subtraction (assuming pixels_array contains (x, y) coordinates)
-            subtracted_image[pixels_array[:, 0], pixels_array[:, 1]] -= 1
-
-        # Check if the result is an image of all zeros
-        all_zeros = np.all(subtracted_image == 0)
-
-        return all_zeros
+    return binary_array_rotated

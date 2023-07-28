@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.fftpack import fftshift, fft2
+from skimage.measure import label
 import numpy as np
 import tifffile
 from tkinter import filedialog
@@ -84,8 +85,11 @@ class SEMImageDetails:
         self.midlevel = edges.threshold_level(self.image_flat, 0.6)
         self.image_binary = edges.blackwhite_image(self.image_flat, self.midlevel)
         self.image_boundaries = edges.boundary_image(self.image_binary)
+        self.image_boundaries = label(self.image_boundaries, connectivity=2)
         self.boundaries = edges.boundary_lines(self.image_boundaries)
-        edges.boundary_edges_rotate(self.image_boundaries, self.boundaries)
+        self.image_boundaries = edges.boundary_edges_rotate(self.image_boundaries, self.boundaries)
+
+        tools.simple_image_display(self.image_boundaries, "rotated and labeled")
 
         # These operations have to deal with LER, LWR, LPR
 
