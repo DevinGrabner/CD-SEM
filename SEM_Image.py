@@ -89,21 +89,27 @@ class SEMImageDetails:
         self.image_boundaries = edges.boundary_image(self.image_binary)
         self.image_boundaries = label(self.image_boundaries, connectivity=2)
         edges.clean_boundary_lines(self.image_boundaries)
-        
+
         self.rotate_angle = edges.avg_rotation(self.image_boundaries)
-        self.image_binary = edges.trim_rotation(tools.rotate_image(self.image_binary, self.rotate_angle), self.rotate_angle)
-        
-        #Now that the original binary image has been straightened we have to redo the line detection because the rotation of sigle pixel wide lines doesn't map to single pixels.
+        self.image_binary = edges.trim_rotation(
+            tools.rotate_image(self.image_binary, self.rotate_angle), self.rotate_angle
+        )
+
+        # Now that the original binary image has been straightened we have to redo the line detection because the rotation of sigle pixel wide lines doesn't map to single pixels.
         self.image_boundaries = edges.boundary_image(self.image_binary)
         self.image_boundaries = label(self.image_boundaries, connectivity=2)
         edges.clean_boundary_lines(self.image_boundaries)
 
         self.boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
-
-        tools.simple_image_display(np.copy(self.image_binary), "Binary Image")
-        tools.simple_image_display(edges.blackwhite_image(np.copy(self.image_boundaries), 0.5), "rotated edge boundaries")
-
-        self.bw_order = edges.edge_boundary_order(self.image_boundaries, self.boundaries)
+        self.bw_order = edges.edge_boundary_order(
+            self.image_boundaries, self.boundaries
+        )
+        edges.display_overlay(
+            edges.blackwhite_image(np.copy(self.image_boundaries), 0.5),
+            np.copy(self.image_binary),
+            "Boundary Overlay",
+            10,
+        )
 
         # These operations have to deal with LER, LWR, LPR
 

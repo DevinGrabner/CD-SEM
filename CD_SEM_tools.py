@@ -98,7 +98,6 @@ def simple_image_display(img: np.array, title: str) -> None:
         img (np.array): Array to display
         title (str): Title of image
     """
-
     plt.figure(figsize=(10, 10))
     plt.imshow(img, cmap="gray")
     plt.title(title)

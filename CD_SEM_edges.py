@@ -108,7 +108,12 @@ def boundary_image(img: np.array) -> np.array:
     return edges
 
 
-def clean_boundary_lines(boundary_img: np.array):
+def clean_boundary_lines(boundary_img: np.array) -> None:
+    """Removed all of the boundary lines that are incomplete and touching the sides of the image
+
+    Args:
+        boundary_img (np.array): The image of labeled boundary lines
+    """
     for region in regionprops(boundary_img):
         # Check if the line touches the left or right boundary of the image
         touches_left_boundary = any(pixel[1] == 0 for pixel in region.coords)
@@ -124,13 +129,13 @@ def clean_boundary_lines(boundary_img: np.array):
 
 
 def avg_rotation(boundary_img: np.array) -> float:
-    """_summary_
+    """Caclulates the average tilt of all the lines in the SEM image
 
     Args:
-        boundary_img (np.array): _description_
+        boundary_img (np.array): binarized SEM image that need rotated
 
     Returns:
-        float: _description_
+        float: The average angle in radian that the lines are tilted
     """
     # Calculate the rotation angle for each line
     rotation_angles = [
@@ -197,7 +202,6 @@ def boundary_edges(boundary_img: np.array) -> dict:
     Returns:
         dict: dictionary of the labeled boundary edge lines. Keyword "Line #": Value(List of points that make up the line)
     """
-
     num_labels = np.amax(boundary_img)
     lines = {f"Line {i + 1}": [] for i in range(num_labels)}
 
@@ -205,7 +209,7 @@ def boundary_edges(boundary_img: np.array) -> dict:
         for pixel in region.coords:
             line_label = boundary_img[pixel[0], pixel[1]]
             lines[f"Line {line_label}"].append((pixel[0], pixel[1]))
-            #[row], [column]
+            # [row], [column]
 
     return lines
 
@@ -232,7 +236,9 @@ def edge_boundary_order(binary_img: np.array, lines: dict) -> str:
     midpoint_x = (middle_pixel_line1_x + middle_pixel_line2_x) // 2
 
     # Get the value at the pixel located at midpoint_coordinates from the binary_img
-    value_at_midpoint = binary_img[int((line1_region[len(line1_region) // 2])[0]), int(midpoint_x)]
+    value_at_midpoint = binary_img[
+        int((line1_region[len(line1_region) // 2])[0]), int(midpoint_x)
+    ]
 
     if value_at_midpoint == 1:
         print("The space between lines 1 and 2 is a 'white' space")
@@ -240,3 +246,30 @@ def edge_boundary_order(binary_img: np.array, lines: dict) -> str:
     elif value_at_midpoint == 0:
         print("The space between lines 1 and 2 is a 'black' space")
         return "black"
+
+
+def display_overlay(
+    top_image: np.array, bottom_image: np.array, title: str, size: int
+) -> None:
+    """Displays and overlay of the two input images
+
+    Args:
+        top_image (np.array): The image of the boundary lines
+        bottom_image (np.array): The Black and White image
+        title (str): Title of the image
+        size (int): Size of the window to be produced
+    """
+    # Set the custom figure size
+    plt.figure(figsize=(size, size))
+
+    # Plot the bottom image with the default 'gray' colormap (black for 0, white for 1)
+    plt.imshow(bottom_image, cmap="gray", vmin=0, vmax=1, aspect="auto")
+
+    # Plot the top image on top of the bottom image as bright green for non-zero values
+    plt.imshow(top_image, cmap="Greens", alpha=0.7, aspect="auto")
+
+    # Show the plot
+    plt.axis("off")  # Turn off axis ticks and labels
+    plt.colorbar()
+    plt.title(title)
+    plt.show()
