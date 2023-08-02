@@ -37,9 +37,8 @@ class SEMImageDetails:
         self.image_PDS_center: None | float = (
             None  # PDS of the zero frequency of the FFT image
         )
-        self.image_rotate: None | float = (
-            None  # The angle the image needs rotated to make sure the FFT is horizontal
-        )
+        self.rotate_angle: None | float = None
+
         self.peakposition: np.array | None = None
         self.midlevel: float | None = None
         self.boundaries: dict | None = None
@@ -66,9 +65,9 @@ class SEMImageDetails:
         self.image_PDS, self.image_PDS_center = FFTcalc.PDS_img(self.image_clipped)
         ###        self.display_fft_image(self.image_PDS, title="Power Spectral Density")
 
-        self.image_rotate = FFTcalc.rotated_angle(25, self.image_PDS, self.lmax)
+        self.rotate_angle = FFTcalc.rotated_angle(25, self.image_PDS, self.lmax)
 
-        if self.image_rotate > 0:
+        if self.rotate_angle > 0:
             self.image_clipped = tools.rotate_image(
                 self.image_clipped, self.image_rotate
             )
@@ -79,17 +78,21 @@ class SEMImageDetails:
 
         self.image_flat = FFTcalc.filter_img(self)
 
-        ###        self.display_SEM_image(self.image_flat, bar=True, title="Filtered SEM Image")
+        ###         self.display_SEM_image(self.image_flat, bar=True, title="Filtered SEM Image")
 
         # These operations have to deal with threasholding, binary filter, and finding line edges
         self.midlevel = edges.threshold_level(self.image_flat, 0.6)
         self.image_binary = edges.blackwhite_image(self.image_flat, self.midlevel)
+        
+        # Clean and straighten the image with the edge boundaries
         self.image_boundaries = edges.boundary_image(self.image_binary)
         self.image_boundaries = label(self.image_boundaries, connectivity=2)
-        self.boundaries = edges.boundary_lines(self.image_boundaries)
-        self.image_boundaries = edges.boundary_edges_rotate(self.image_boundaries, self.boundaries)
+        edges.clean_boundary_lines(self.image_boundaries)
+        self.boundaries, self.rotate_angle, self.image_boundaries = edges.boundary_edges_rotate(self.image_boundaries)
+        
 
-        tools.simple_image_display(self.image_boundaries, "rotated and labeled")
+        tools.simple_image_display(tools.rotate_image(self.image_binary, self.rotate_angle), "Binary Image")
+        tools.simple_image_display(edges.blackwhite_image(self.image_boundaries,0.5), "rotated edge boundaries")
 
         # These operations have to deal with LER, LWR, LPR
 

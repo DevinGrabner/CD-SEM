@@ -111,9 +111,9 @@ def rotated_angle(probe: int, img: np.array, lmax: int) -> float:
         ra = 0
     print("Angle of rotation:", ra)
 
+    """
     angle_range = np.linspace(-probe, probe, len(totals))
     angle_range_plusminus3 = np.linspace(-probe + 3, probe - 3, len(totals2))
-    """
     plt.plot(angle_range, totals, marker="o", linestyle="-", label="Totals")
     plt.plot(angle_range_plusminus3, totals2, label="Moving Median")
 
@@ -199,6 +199,7 @@ def fourier_pitch(img: object) -> float:
 
         # fitpitch = 2 Pi/m /. fitslope
         fitpitch = 2 * np.pi / slope
+
         """
         # Plotting
         plt.figure(figsize=(8, 6))

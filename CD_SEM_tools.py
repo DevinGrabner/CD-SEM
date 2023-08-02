@@ -3,6 +3,7 @@ import numpy as np
 from skimage import transform
 import matplotlib.pyplot as plt
 from scipy.stats import scoreatpercentile
+from scipy.ndimage import rotate
 
 
 def open_window():
@@ -52,22 +53,21 @@ def clip_image(img: np.array) -> np.array:
 
 
 def rotate_image(image: np.array, angle: float) -> np.array:
-    """Takes the input image and rotates it by the given angle
+    """Takes the input image and rotates it by the given angle around the center pixel
 
     Args:
-        image (np.array): 2D PSD image
-        angle (float): angle of needed rotation given by def rotate_angle()
+        image (np.array): image that needs rotated
+        angle (float): angle in radians of needed rotation
 
     Returns:
-        np.array: rotated 2D PSD image
+        np.array: rotated image
     """
-    # Define the transformation function for rotation
-    transform_matrix = transform.AffineTransform(rotation=np.deg2rad(angle))
+    # Perform the rotation around the center
+    rotated_image = rotate(
+        image, np.degrees(angle), reshape=False, order=1, mode="nearest"
+    )
 
-    # Perform the image transformation
-    transformed_image = transform.warp(np.copy(image), inverse_map=transform_matrix)
-
-    return transformed_image
+    return rotated_image
 
 
 def pad_vector_to_match_length(vector: np.array, target_vector: np.array) -> np.array:
@@ -98,7 +98,7 @@ def simple_image_display(img: np.array, title: str) -> None:
         img (np.array): Array to display
         title (str): Title of image
     """
-    # Display the original binary image and the edges
+
     plt.figure(figsize=(10, 10))
     plt.imshow(img, cmap="gray")
     plt.title(title)

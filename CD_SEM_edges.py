@@ -108,33 +108,19 @@ def boundary_image(img: np.array) -> np.array:
     return edges
 
 
-def boundary_lines(boundary_img: np.array) -> dict:
-    """Label each line the self.image_boundaries array and returs a dictionary of the corresponding pixel coordinates making up the line
-
-    Args:
-        binary_array (np.array): Boundary line image to label
-
-    Returns:
-        dict: Dictionary containing a mapping of each labeled line (connected component) to a list of its corresponding pixel coordinates
-    """
-    num_labels = np.amax(boundary_img)
-    lines = {f"Line {i + 1}": [] for i in range(num_labels)}
-
+def clean_boundary_lines(boundary_img: np.array):
     for region in regionprops(boundary_img):
-        for pixel in region.coords:
-            line_label = boundary_img[pixel[0], pixel[1]]
-            lines[f"Line {line_label}"].append((pixel[0], pixel[1]))
+        # Check if the line touches the left or right boundary of the image
+        touches_left_boundary = any(pixel[1] == 0 for pixel in region.coords)
+        touches_right_boundary = any(
+            pixel[1] == boundary_img.shape[1] - 1 for pixel in region.coords
+        )
 
-    # Zero out lines with pixels at column 0 or column image width
-    image_width = boundary_img.shape[1]
-    for line_label, pixels in lines.items():
-        first_pixel_col = min(pixels, key=lambda pixel: pixel[1])[1]
-        last_pixel_col = max(pixels, key=lambda pixel: pixel[1])[1]
-
-        if first_pixel_col == 0 or last_pixel_col == image_width - 1:
-            for pixel in pixels:
+        if touches_left_boundary or touches_right_boundary:
+            for pixel in region.coords:
                 boundary_img[pixel[0], pixel[1]] = 0
-    return lines
+
+    label(boundary_img, connectivity=2)
 
 
 def calculate_rotation_angle(points: list) -> float:
@@ -158,62 +144,63 @@ def calculate_rotation_angle(points: list) -> float:
 
     # Calculate the angle between the line and the horizontal axis
     angle_rad = -np.arctan(m)
-    angle_deg = np.degrees(angle_rad)
 
-    return angle_deg
-
-
-def apply_rotation(image: np.array, angle_deg: float) -> np.array:
-    """Rotates the input image by the input angle around (0,0)
-
-    Args:
-        image (np.array): image to rotate
-        angle_deg (float): angle to rotate the image to
-
-    Returns:
-        np.array: rotated image
-    """
-    # Apply rotation to the image and pixel coordinates
-    rows, cols = image.shape
-    rotated_image = np.zeros_like(image)
-    pixels = [(x, y) for x, y in np.argwhere(image)]
-    for pixel in pixels:
-        x, y = pixel
-        x_rot = int(
-            x * np.cos(np.radians(angle_deg)) - y * np.sin(np.radians(angle_deg))
-        )
-        y_rot = int(
-            x * np.sin(np.radians(angle_deg)) + y * np.cos(np.radians(angle_deg))
-        )
-        if 0 <= x_rot < rows and 0 <= y_rot < cols:
-            rotated_image[x_rot, y_rot] = image[x, y]
-
-    return rotated_image
+    return angle_rad
 
 
-def boundary_edges_rotate(boundary_img: np.array, lines: dict) -> np.array:
-    """Parent fuction to conduct an image rotation of the boundary edge image
+def trim_rotation(image: np.array, angle_rad: float) -> np.array:
+    """_summary_
 
     Args:
-        boundary_img (np.array): image that needs rotated
-        lines (dict): dictionary of the labeled boundary edge lines. Keywork "Line #": Value(List of points that make up the line)
+        image (np.array): _description_
+        angle_rad (float): _description_
 
     Returns:
-        np.array: Rotated image
+        np.array: _description_
     """
-    # Calculate the average rotation angle for each line
+    width = image.shape[1]
+    pix = int(width * np.tan(abs(angle_rad)))
+    trimmed_img = np.copy(image)
+    # I have no good reason to trim of 1.5*pix instead of just pix. Except that there was not enough getting trimmed. Maybe something different than 1.5 would be better?
+    trimmed_img = trimmed_img[(int(1.5 * pix)) : -(int(1.5 * pix)), :]
+
+    return trimmed_img
+
+
+def boundary_edges_rotate(boundary_img: np.array) -> tuple:
+    """Takes the cleaned edge boundary image, calculates the rotation needed so that all the lines are vertical and then rotates.
+      The rotated image is then trimmed so that all the lines extend the full length of the new image. Finally a dictionary with with the coordinates
+      of all the points making up a line is made and returned.
+
+    Args:
+        boundary_img (np.array): Cleaned edge boundary image
+        lines (dict): _description_
+
+    Returns:
+        dict: dictionary of the labeled boundary edge lines. Keyword "Line #": Value(List of points that make up the line)
+        float: Average Rotation Angle
+        np.array: cleaned and rotated image
+    """
+    # Calculate the rotation angle for each line
     rotation_angles = [
-        calculate_rotation_angle(lines[f"Line {line_label}"])
-        for line_label in range(1, len(lines) + 1)
+        calculate_rotation_angle(region.coords) for region in regionprops(boundary_img)
     ]
 
     # Calculate the average rotation angle for all lines
     avg_rotation_angle = np.mean(rotation_angles)
-    print(avg_rotation_angle)
+    print(f"Average Rotation Angle: {round(np.degrees(avg_rotation_angle), 2)} Degrees")
 
     # Apply rotation to the binary_array and all the lines' pixel coordinates
-    binary_array_rotated = apply_rotation(
-        boundary_img, avg_rotation_angle
-    )
+    rotated_boundary_img = tools.rotate_image(boundary_img, avg_rotation_angle)
+    # Trim image to overlapping range amongst all lines
+    rotated_boundary_img = trim_rotation(rotated_boundary_img, avg_rotation_angle)
 
-    return binary_array_rotated
+    num_labels = np.amax(rotated_boundary_img)
+    lines = {f"Line {i + 1}": [] for i in range(num_labels)}
+
+    for region in regionprops(rotated_boundary_img):
+        for pixel in region.coords:
+            line_label = rotated_boundary_img[pixel[0], pixel[1]]
+            lines[f"Line {line_label}"].append((pixel[0], pixel[1]))
+
+    return lines, avg_rotation_angle, rotated_boundary_img
