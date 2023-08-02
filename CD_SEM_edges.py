@@ -92,7 +92,7 @@ def blackwhite_image(img: np.array, midlevel: float) -> np.array:
 
 def boundary_image(img: np.array) -> np.array:
     """Taken a binary image and returns single pixel width lines that correspond
-        to the outside edges of the outside edge of the white lines.
+        to the outside edges of the edges of the white lines.
 
     Args:
         img (np.array): Binary image to find line edges on
@@ -123,6 +123,26 @@ def clean_boundary_lines(boundary_img: np.array):
     label(boundary_img, connectivity=2)
 
 
+def avg_rotation(boundary_img: np.array) -> float:
+    """_summary_
+
+    Args:
+        boundary_img (np.array): _description_
+
+    Returns:
+        float: _description_
+    """
+    # Calculate the rotation angle for each line
+    rotation_angles = [
+        calculate_rotation_angle(region.coords) for region in regionprops(boundary_img)
+    ]
+
+    # Calculate the average rotation angle for all lines
+    avg_rotation_angle = np.mean(rotation_angles)
+    print(f"Average Rotation Angle: {round(np.degrees(avg_rotation_angle), 2)} Degrees")
+    return avg_rotation_angle
+
+
 def calculate_rotation_angle(points: list) -> float:
     """Fits a linear line the input boundary edge and calculates the tilt angle
 
@@ -149,14 +169,14 @@ def calculate_rotation_angle(points: list) -> float:
 
 
 def trim_rotation(image: np.array, angle_rad: float) -> np.array:
-    """_summary_
+    """Trims up the rotated image so that the lines exent the full length. They need to all overlap so that further statistical analysis can be done.
 
     Args:
-        image (np.array): _description_
-        angle_rad (float): _description_
+        image (np.array): Image that needs trimmed
+        angle_rad (float): The angle it was rotated at. Used to calculate how much to trim
 
     Returns:
-        np.array: _description_
+        np.array: trimmed array
     """
     width = image.shape[1]
     pix = int(width * np.tan(abs(angle_rad)))
@@ -167,40 +187,56 @@ def trim_rotation(image: np.array, angle_rad: float) -> np.array:
     return trimmed_img
 
 
-def boundary_edges_rotate(boundary_img: np.array) -> tuple:
-    """Takes the cleaned edge boundary image, calculates the rotation needed so that all the lines are vertical and then rotates.
-      The rotated image is then trimmed so that all the lines extend the full length of the new image. Finally a dictionary with with the coordinates
+def boundary_edges(boundary_img: np.array) -> dict:
+    """Takes the cleaned edge boundary image and returns a dictionary with with the coordinates
       of all the points making up a line is made and returned.
 
     Args:
         boundary_img (np.array): Cleaned edge boundary image
-        lines (dict): _description_
 
     Returns:
         dict: dictionary of the labeled boundary edge lines. Keyword "Line #": Value(List of points that make up the line)
-        float: Average Rotation Angle
-        np.array: cleaned and rotated image
     """
-    # Calculate the rotation angle for each line
-    rotation_angles = [
-        calculate_rotation_angle(region.coords) for region in regionprops(boundary_img)
-    ]
 
-    # Calculate the average rotation angle for all lines
-    avg_rotation_angle = np.mean(rotation_angles)
-    print(f"Average Rotation Angle: {round(np.degrees(avg_rotation_angle), 2)} Degrees")
-
-    # Apply rotation to the binary_array and all the lines' pixel coordinates
-    rotated_boundary_img = tools.rotate_image(boundary_img, avg_rotation_angle)
-    # Trim image to overlapping range amongst all lines
-    rotated_boundary_img = trim_rotation(rotated_boundary_img, avg_rotation_angle)
-
-    num_labels = np.amax(rotated_boundary_img)
+    num_labels = np.amax(boundary_img)
     lines = {f"Line {i + 1}": [] for i in range(num_labels)}
 
-    for region in regionprops(rotated_boundary_img):
+    for region in regionprops(boundary_img):
         for pixel in region.coords:
-            line_label = rotated_boundary_img[pixel[0], pixel[1]]
+            line_label = boundary_img[pixel[0], pixel[1]]
             lines[f"Line {line_label}"].append((pixel[0], pixel[1]))
+            #[row], [column]
 
-    return lines, avg_rotation_angle, rotated_boundary_img
+    return lines
+
+
+def edge_boundary_order(binary_img: np.array, lines: dict) -> str:
+    """Returns a string defining whether it is a white are black space between the first two lines, defining the begining of the alternating pattern.
+
+    Args:
+        binary_img (np.array): The black and white rotated binary image
+        lines (dict): Dictionary of coordinate position of boundary edges
+
+    Returns:
+        str: "white" or "black"
+    """
+    # Find the line regions for Line 1 and Line 2
+    line1_region = lines["Line 1"]
+    line2_region = lines["Line 2"]
+
+    # Calculate the x-coordinate of the middle pixel of each line
+    middle_pixel_line1_x = (line1_region[len(line1_region) // 2])[1]
+    middle_pixel_line2_x = (line2_region[len(line1_region) // 2])[1]
+
+    # Calculate the x-coordinate of the pixel halfway between the middle pixels of each line
+    midpoint_x = (middle_pixel_line1_x + middle_pixel_line2_x) // 2
+
+    # Get the value at the pixel located at midpoint_coordinates from the binary_img
+    value_at_midpoint = binary_img[int((line1_region[len(line1_region) // 2])[0]), int(midpoint_x)]
+
+    if value_at_midpoint == 1:
+        print("The space between lines 1 and 2 is a 'white' space")
+        return "white"
+    elif value_at_midpoint == 0:
+        print("The space between lines 1 and 2 is a 'black' space")
+        return "black"
