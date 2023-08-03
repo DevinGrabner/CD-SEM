@@ -1,6 +1,7 @@
 import CD_SEM_tools as tools
 import CD_SEM_FFT as FFTcalc
 import CD_SEM_edges as edges
+import CD_SEM_analysis as anly
 
 # import CD_SEM_ruffness as ruff
 # import CD_SEM_analysis as anlys
@@ -110,9 +111,13 @@ class SEMImageDetails:
             "Boundary Overlay",
             10,
         )
-        self.fitpitch = edges.pitch_fit(self.boundaries, (self.pix_size * self.pix_scale * 10**3))
+        self.fitpitch = edges.pitch_fit(
+            self.boundaries, (self.pix_size * self.pix_scale)
+        )
 
         # These operations have to deal with LER, LWR, LPR
+
+        anly.LER(self.boundaries, (self.pix_scale * self.pix_size))
 
         # These operations have to deal with statistical line analysis
 
@@ -159,8 +164,8 @@ class SEMImageDetails:
         # List containing the proper name, value, and dimension
         PixelList = list(ImagTagDict.get("ap_image_pixel_size"))
 
-        # Checks the pixel dimesion and assigns the appropriate scale so the dimensions are in um
-        unitConversion = {"pm": 10**-6, "nm": 10**-3, "um": 1}
+        # Checks the pixel dimesion and assigns the appropriate scale so the dimensions are in nm
+        unitConversion = {"pm": 10**-3, "nm": 1, "um": 10**3}
         if PixelList[2] not in unitConversion:
             while True:
                 PixelList[1] = float(
@@ -169,7 +174,7 @@ class SEMImageDetails:
                     )
                 )
                 if PixelList[1] > 0:
-                    PixelList[0] = 10**-3
+                    PixelList[0] = 1
                     PixelList[2] = "nm"
                     break
         PixelList[0] = unitConversion.get(PixelList[2])

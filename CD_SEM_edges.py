@@ -268,10 +268,21 @@ def display_overlay(
 
 
 def pitch_fit(lines: dict, scale: float) -> float:
-    leading_edge = tools.extract_repeating_dict_entries(lines)
-    centroids = [sum(col for _, col in points) / len(points) for points in leading_edge.values()]
+    """Caclulates and returns the pitch of the grating lines
 
-    line_num = [i for i in range(1, len(centroids) + 1,2)]
+    Args:
+        lines (dict): Dictionary of the line edge boundary coordiates
+        scale (float): nanometers per pixel
+
+    Returns:
+        pitch: float: pitch of the grating lines in nanometers
+    """
+    leading_edge = tools.extract_repeating_dict_entries(lines)
+    centroids = [
+        sum(col for _, col in points) / len(points) for points in leading_edge.values()
+    ]
+
+    line_num = [i for i in range(1, len(centroids) + 1)]
 
     fit = tools.linear_fit(list(zip(centroids, line_num)))
     pitch = scale * fit[0]

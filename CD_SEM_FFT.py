@@ -23,7 +23,7 @@ def image_size(
     """
     imax = int(2 ** np.floor(np.log2(height)))
     lmax = (imax + 40) if height >= (imax + 40) else imax
-    kscale = 2 * np.pi / (lmax * pixel_size * pixel_scale * 10**3)
+    kscale = 2 * np.pi / (lmax * pixel_size * pixel_scale)
     return imax, lmax, kscale
 
 
