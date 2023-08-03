@@ -110,6 +110,7 @@ class SEMImageDetails:
             "Boundary Overlay",
             10,
         )
+        self.fitpitch = edges.pitch_fit(self.boundaries, (self.pix_size * self.pix_scale * 10**3))
 
         # These operations have to deal with LER, LWR, LPR
 
@@ -174,12 +175,14 @@ class SEMImageDetails:
         PixelList[0] = unitConversion.get(PixelList[2])
         return PixelList
 
-    def display_SEM_image(self: object, image: tifffile, title=None, bar=False) -> None:
+    def display_SEM_image(
+        self: object, image: tifffile, title: str = None, bar: bool = False
+    ) -> None:
         """Displays an image with scale bar (if wanted) based on pixel size from the image
 
         Args:
             image (np.ndarray): image that you want displayed
-            title (string): Title of the image if wanted
+            title (str): Title of the image if wanted
             bar (bool, optional): Option to display scale bar on image. Defaults to False.
         """
 
@@ -223,12 +226,12 @@ class SEMImageDetails:
         # Show the plot
         plt.show()
 
-    def display_fft_image(self: object, fimg: np.array, title=None) -> None:
+    def display_fft_image(self: object, fimg: np.array, title: str = None) -> None:
         """Displays the scaled FFT image on a colorblind friendly colorbar
 
         Args:
             fimg (np.ndarray): FFT image getting displayed
-            title (string): Title of the image if wanted
+            title (str): Title of the image if wanted
         """
         # Define a colorblind-friendly colormap
         cmap = LinearSegmentedColormap.from_list(

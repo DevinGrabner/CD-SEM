@@ -61,7 +61,7 @@ def PDS_img(img: np.array) -> tuple[np.array, float]:
     center = np.array(fimg.shape) // 2
     ctrval = fimg[center, center]
     fimg = np.log(fimg)
-    fimg = tools.rescale_array(fimg, 0, 1)
+    fimg = tools.rescale_array(fimg)
     fimg[center, center] = 1
     return fimg, ctrval
 

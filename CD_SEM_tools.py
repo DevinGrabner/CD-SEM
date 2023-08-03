@@ -15,7 +15,7 @@ def open_window():
     root.focus_force()
 
 
-def rescale_array(arr: np.array, new_min: float, new_max: float) -> np.array:
+def rescale_array(arr: np.array, new_min: float = 0, new_max: float = 1) -> np.array:
     """Rescales the input array between the new_min and new_max values provided
 
     Args:
@@ -49,7 +49,7 @@ def clip_image(img: np.array) -> np.array:
     """
     xlow = scoreatpercentile(img, 0.05)
     xhigh = scoreatpercentile(img, 99.95)
-    return rescale_array(np.clip(np.copy(img), xlow, xhigh), 0, 1)
+    return rescale_array(np.clip(np.copy(img), xlow, xhigh))
 
 
 def rotate_image(image: np.array, angle: float) -> np.array:
@@ -104,3 +104,43 @@ def simple_image_display(img: np.array, title: str) -> None:
     plt.colorbar()
     plt.axis("off")
     plt.show()
+
+
+def extract_repeating_dict_entries(
+    dictionary: dict, start: int = 0, repeat: int = 2
+) -> dict:
+    """Extracts some repeated number at a given interval of dictionary entries
+
+    Args:
+        dictionary (dict): Full Dictionary
+        start (int, optional): First entry to extract. Defaults to 0.
+        repeat (int, optional): The interval to extract entries. Defaults to 2.
+
+    Returns:
+        dict: Dictionary with the extracted entries
+    """
+    keys = list(dictionary.keys())[start::repeat]
+    values = [dictionary[key] for key in keys]
+    extracted_entries = dict(zip(keys, values))
+    return extracted_entries
+
+
+def linear_fit(points: list) -> tuple[float, float]:
+    """Calculates the slope and intercept of an input line of coordinates
+
+    Args:
+        points (list): All (row, column) points that make up the boundary edge line
+
+    Returns:
+        tuple[slope: float, intercept: float]: slope, interecpt of linear fit line
+    """
+    # Convert the points list to a NumPy array
+    points_array = np.array(points)
+
+    # Extract x and y coordinates from the points array
+    x = points_array[:, 1]
+    y = points_array[:, 0]
+
+    A = np.vstack([x, np.ones(len(x))]).T
+    m, c = np.linalg.lstsq(A, y, rcond=None)[0]
+    return m, c

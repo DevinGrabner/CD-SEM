@@ -77,7 +77,7 @@ def blackwhite_image(img: np.array, midlevel: float) -> np.array:
     smoothed_image = filters.gaussian(
         binary_image, sigma=sigma, mode="constant", cval=0
     )
-    smoothed_image = tools.rescale_array(smoothed_image, 0, 1)
+    smoothed_image = tools.rescale_array(smoothed_image)
     # Threshold the smoothed image using another threshold value
     bw_image = (np.where(smoothed_image >= 0.5, 1, 0)).astype(np.uint8)
 
@@ -104,7 +104,7 @@ def boundary_image(img: np.array) -> np.array:
     edges = segmentation.find_boundaries(img, mode="outer", background=0).astype(
         np.uint8
     )
-    edges = (np.where(tools.rescale_array(edges, 0, 1) >= 0.5, 1, 0)).astype(np.uint8)
+    edges = (np.where(tools.rescale_array(edges) >= 0.5, 1, 0)).astype(np.uint8)
     return edges
 
 
@@ -152,23 +152,15 @@ def calculate_rotation_angle(points: list) -> float:
     """Fits a linear line the input boundary edge and calculates the tilt angle
 
     Args:
-        points (list): All (x,y) points that make up the boundary edge line
+        points (list): All (row, column) points that make up the boundary edge line
 
     Returns:
         float: angle in degree the line need to rotate
     """
-    # Convert the points list to a NumPy array
-    points_array = np.array(points)
-
-    # Extract x and y coordinates from the points array
-    x = points_array[:, 0]
-    y = points_array[:, 1]
-
-    A = np.vstack([x, np.ones(len(x))]).T
-    m, c = np.linalg.lstsq(A, y, rcond=None)[0]
+    slope = tools.linear_fit(points)[0]
 
     # Calculate the angle between the line and the horizontal axis
-    angle_rad = -np.arctan(m)
+    angle_rad = -np.arctan(1 / slope)
 
     return angle_rad
 
@@ -273,3 +265,24 @@ def display_overlay(
     plt.colorbar()
     plt.title(title)
     plt.show()
+
+
+def pitch_fit(lines: dict, scale: float) -> float:
+    leading_edge = tools.extract_repeating_dict_entries(lines)
+    centroids = [sum(col for _, col in points) / len(points) for points in leading_edge.values()]
+
+    line_num = [i for i in range(1, len(centroids) + 1,2)]
+
+    fit = tools.linear_fit(list(zip(centroids, line_num)))
+    pitch = scale * fit[0]
+
+    plt.plot(line_num, centroids, "bo", label="Data")
+    plt.plot(line_num, (fit[0] * np.array(line_num) + fit[1]), "r-", label="Fit")
+    plt.xlabel("Line Number")
+    plt.ylabel("Centroid, (px)")
+    plt.title(f"Pitch = {round(pitch, 3)} nm")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    return pitch
