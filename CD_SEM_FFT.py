@@ -109,7 +109,7 @@ def rotated_angle(probe: int, img: np.array, lmax: int) -> float:
         ra = np.arctan((max_index - (probe - 3 + 1)) / (lmax / 2 - 1)) * 180 / np.pi
     else:
         ra = 0
-    print("Angle of rotation:", ra)
+#    print("Angle of rotation:", ra)
 
     """
     angle_range = np.linspace(-probe, probe, len(totals))

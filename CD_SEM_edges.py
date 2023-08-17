@@ -2,9 +2,8 @@ import CD_SEM_tools as tools
 import CD_SEM_FFT as FFTcalc
 import numpy as np
 import matplotlib.pyplot as plt
+from skimage import filters, segmentation, morphology, util
 from skimage.measure import label, regionprops
-from scipy.spatial import distance
-from skimage import filters, segmentation
 
 
 def threshold_level(image: np.array, thresh: float) -> float:
@@ -42,8 +41,8 @@ def threshold_level(image: np.array, thresh: float) -> float:
     # cutlevel is defined as the weighted midpoint between the black and white levels
     cutlevel = (1 - thresh) * bin_centers[black_idx] + thresh * bin_centers[white_idx]
 
-    print("blackwhite =", [bin_centers[black_idx], bin_centers[white_idx]])
-    print("Threshold Level =", cutlevel)
+    #    print("blackwhite =", [bin_centers[black_idx], bin_centers[white_idx]])
+    #    print("Threshold Level =", cutlevel)
 
     """
     # Plot the histogram and the 2nd derivative with the cutlevel line
@@ -90,6 +89,50 @@ def blackwhite_image(img: np.array, midlevel: float) -> np.array:
     return bw_image
 
 
+def remove_defects(binary_image, crop=5):
+    img = util.crop(np.copy(binary_image), ((crop, crop), (crop, crop)))
+
+    # Label all White Lines of binary image
+    labeled_img = label(img, connectivity=2)
+
+    # Removes all lines which touch the parrallel edges and do not extend all the way accross
+    # Get region properties
+    regions = regionprops(labeled_img)
+
+    # Get image dimensions
+    image_height, image_width = labeled_img.shape
+
+    # Create an array of zeros with the same shape as the original image
+    cleaned_image = np.zeros_like(labeled_img)
+
+    # Compute median solidity value (Convexity of a shape)
+    solidities = np.array([region.solidity for region in regionprops(labeled_img)])
+    median_solidity = np.median(solidities)
+    solidity_range = 0.5
+
+    for region in regions:
+        min_row, min_col, max_row, max_col = region.bbox
+
+        # Check if the region touches the left or right margin
+        # Check if the region doesn't extend the full height of the image
+        if (
+            min_col != 0
+            and max_col != image_width
+            and min_row == 0
+            and max_row == image_height
+        ):
+            if (
+                (1 - solidity_range) * median_solidity
+                < region.solidity
+                < (1 + solidity_range) * median_solidity
+            ):
+                for coord in region.coords:
+                    cleaned_image[coord[0], coord[1]] = 1
+
+    cleaned_image = label(cleaned_image, connectivity=2)
+    return cleaned_image
+
+
 def boundary_image(img: np.array) -> np.array:
     """Taken a binary image and returns single pixel width lines that correspond
         to the outside edges of the edges of the white lines.
@@ -106,26 +149,6 @@ def boundary_image(img: np.array) -> np.array:
     )
     edges = (np.where(tools.rescale_array(edges) >= 0.5, 1, 0)).astype(np.uint8)
     return edges
-
-
-def clean_boundary_lines(boundary_img: np.array) -> None:
-    """Removed all of the boundary lines that are incomplete and touching the sides of the image
-
-    Args:
-        boundary_img (np.array): The image of labeled boundary lines
-    """
-    for region in regionprops(boundary_img):
-        # Check if the line touches the left or right boundary of the image
-        touches_left_boundary = any(pixel[1] == 0 for pixel in region.coords)
-        touches_right_boundary = any(
-            pixel[1] == boundary_img.shape[1] - 1 for pixel in region.coords
-        )
-
-        if touches_left_boundary or touches_right_boundary:
-            for pixel in region.coords:
-                boundary_img[pixel[0], pixel[1]] = 0
-
-    label(boundary_img, connectivity=2)
 
 
 def avg_rotation(boundary_img: np.array) -> float:
@@ -216,21 +239,19 @@ def edge_boundary_order(binary_img: np.array, lines: dict) -> str:
     Returns:
         str: "white" or "black"
     """
-    # Find the line regions for Line 1 and Line 2
-    line1_region = lines["Line 1"]
-    line2_region = lines["Line 2"]
+    # Line coords for Line 1 and Line 2
+    line1_coords = lines["Line 1"]
+    line2_coords = lines["Line 2"]
 
-    # Calculate the x-coordinate of the middle pixel of each line
-    middle_pixel_line1_x = (line1_region[len(line1_region) // 2])[1]
-    middle_pixel_line2_x = (line2_region[len(line1_region) // 2])[1]
+    # Gets the x coordinate for the the line at about the center of the image
+    middle_pixel_line1 = (line1_coords[10])[1]
+    middle_pixel_line2 = (line2_coords[10])[1]
 
-    # Calculate the x-coordinate of the pixel halfway between the middle pixels of each line
-    midpoint_x = (middle_pixel_line1_x + middle_pixel_line2_x) // 2
+    # Calculate the pixel halfway between the lines
+    midpoint_x = int((middle_pixel_line1 + middle_pixel_line2) // 2)
 
     # Get the value at the pixel located at midpoint_coordinates from the binary_img
-    value_at_midpoint = binary_img[
-        int((line1_region[len(line1_region) // 2])[0]), int(midpoint_x)
-    ]
+    value_at_midpoint = binary_img[(line1_coords[10])[0], midpoint_x]
 
     if value_at_midpoint == 1:
         print("The space between lines 1 and 2 is a 'white' space")

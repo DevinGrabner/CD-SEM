@@ -62,7 +62,7 @@ class SEMImageDetails:
         self.image_clipped = tools.clip_image(
             FFTcalc.extract_center_part(self.image, self.lmax)
         )
-        ###        self.display_SEM_image(self.image_clipped, bar=True, title="Clipped SEM Image")
+        self.display_SEM_image(self.image_clipped, bar=True, title="Clipped SEM Image")
 
         self.image_PDS, self.image_PDS_center = FFTcalc.PDS_img(self.image_clipped)
         ###        self.display_fft_image(self.image_PDS, title="Power Spectral Density")
@@ -82,42 +82,45 @@ class SEMImageDetails:
 
         ###         self.display_SEM_image(self.image_flat, bar=True, title="Filtered SEM Image")
 
-        # These operations have to deal with threasholding, binary filter, and finding line edges
+        # These operations have to deal with threasholding, binary filter
         self.midlevel = edges.threshold_level(self.image_flat, 0.6)
         self.image_binary = edges.blackwhite_image(self.image_flat, self.midlevel)
 
-        # Clean and straighten the image with the edge boundaries
-        self.image_boundaries = edges.boundary_image(self.image_binary)
-        self.image_boundaries = label(self.image_boundaries, connectivity=2)
-        edges.clean_boundary_lines(self.image_boundaries)
+        # Now removing defects and finding line edges
+        self.image_boundaries = edges.boundary_image(edges.remove_defects(np.copy(self.image_binary)))
+        self.image_boundaries = edges.remove_defects(self.image_boundaries)
 
+        # Clean and straighten the image with the edge boundaries
         self.rotate_angle = edges.avg_rotation(self.image_boundaries)
         self.image_binary = edges.trim_rotation(
             tools.rotate_image(self.image_binary, self.rotate_angle), self.rotate_angle
         )
 
-        # Now that the original binary image has been straightened we have to redo the line detection because the rotation of sigle pixel wide lines doesn't map to single pixels.
-        self.image_boundaries = edges.boundary_image(self.image_binary)
-        self.image_boundaries = label(self.image_boundaries, connectivity=2)
-        edges.clean_boundary_lines(self.image_boundaries)
+        # Now that the binary image has been straightened we have to redo the line detection and line defect removal because the rotation of sigle pixel wide lines doesn't map correctly.
+        self.image_boundaries = edges.boundary_image(edges.remove_defects(np.copy(self.image_binary), crop = 0))
+        self.image_boundaries = edges.remove_defects(self.image_boundaries, crop=0)
+        # tools.simple_image_display(self.image_binary, "binary w/o defects")
+        # tools.simple_image_display(self.image_boundaries, "Boundaries w/o defects")
 
         self.boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
-        self.bw_order = edges.edge_boundary_order(
-            self.image_boundaries, self.boundaries
-        )
+        print(self.boundaries)
+        tools.simple_image_display(self.image_binary, "Binary")
+        tools.simple_image_display(edges.blackwhite_image(np.copy(self.image_boundaries),0.5), "Boundaries")
+        # self.bw_order = edges.edge_boundary_order(
+        #     self.image_binary, self.boundaries
+        # )
         edges.display_overlay(
             edges.blackwhite_image(np.copy(self.image_boundaries), 0.5),
             np.copy(self.image_binary),
             "Boundary Overlay",
             10,
         )
-        self.fitpitch = edges.pitch_fit(
-            self.boundaries, (self.pix_size * self.pix_scale)
-        )
+
+        # self.fitpitch = edges.pitch_fit(self.boundaries, (self.pix_size * self.pix_scale))
 
         # These operations have to deal with LER, LWR, LPR
 
-        anly.LER(self.boundaries, (self.pix_scale * self.pix_size))
+        # anly.LER(self.boundaries, (self.pix_scale * self.pix_size))
 
         # These operations have to deal with statistical line analysis
 
@@ -200,7 +203,9 @@ class SEMImageDetails:
             global IMAGE_SCALE_UM
             # calculate the dimensions of the scale bar
             image_height = image.shape[0]
-            scale_bar_length_pixels = IMAGE_SCALE_UM / (self.pix_size * self.pix_scale)
+            scale_bar_length_pixels = IMAGE_SCALE_UM / (
+                self.pix_size * self.pix_scale / 1000
+            )
 
             # calculate the position of the scale bar
             scale_bar_x = image.shape[1] - scale_bar_length_pixels - 100
