@@ -89,48 +89,75 @@ def blackwhite_image(img: np.array, midlevel: float) -> np.array:
     return bw_image
 
 
-def remove_defects(binary_image, crop=5):
+def remove_defects(binary_image: np.array, crop: int = 5) -> np.array:
+    """Removes all lines that are invloved with a defect in the SEM grating image
+
+    Args:
+        binary_image (np.array): binary image of the grating that needs processed
+        crop (int, optional): Number of pixels cropped from the edge to midigate edge effects from the FFT. Defaults to 5.
+
+    Returns:
+        np.array: labeled boundary image
+    """
     img = util.crop(np.copy(binary_image), ((crop, crop), (crop, crop)))
 
     # Label all White Lines of binary image
-    labeled_img = label(img, connectivity=2)
+    boundaries = boundary_image(img)
+    cleaned_image = label(boundaries, connectivity=2)
 
-    # Removes all lines which touch the parrallel edges and do not extend all the way accross
-    # Get region properties
-    regions = regionprops(labeled_img)
+    regions = regionprops(cleaned_image)
 
     # Get image dimensions
-    image_height, image_width = labeled_img.shape
-
-    # Create an array of zeros with the same shape as the original image
-    cleaned_image = np.zeros_like(labeled_img)
-
-    # Compute median solidity value (Convexity of a shape)
-    solidities = np.array([region.solidity for region in regionprops(labeled_img)])
-    median_solidity = np.median(solidities)
-    solidity_range = 0.5
+    image_height, image_width = cleaned_image.shape
 
     for region in regions:
+        label_value = region.label
+        coords = region.coords
         min_row, min_col, max_row, max_col = region.bbox
 
-        # Check if the region touches the left or right margin
-        # Check if the region doesn't extend the full height of the image
+        col_coords = coords[:, 1]
+        row_coords = coords[:, 0]
+
         if (
-            min_col != 0
-            and max_col != image_width
-            and min_row == 0
-            and max_row == image_height
+            (0 in col_coords or image_width - 1 in col_coords)
+            or (
+                np.sum(row_coords == 0) > 1
+                or np.sum(row_coords == image_height - 1) > 1
+            )
+            or min_row != 0
+            or max_row != image_height
+            or check_continuous(coords)
         ):
-            if (
-                (1 - solidity_range) * median_solidity
-                < region.solidity
-                < (1 + solidity_range) * median_solidity
-            ):
-                for coord in region.coords:
-                    cleaned_image[coord[0], coord[1]] = 1
+            cleaned_image[cleaned_image == label_value] = 0
 
     cleaned_image = label(cleaned_image, connectivity=2)
     return cleaned_image
+
+
+def check_continuous(coordinates: list) -> bool:
+    """Checks if a list of coordinates are continuous
+
+    Args:
+        coordinates (list): List of coordinates making up the line to check
+
+    Returns:
+        bool: True if the line is not continuous
+    """
+    x_coords = np.array(coordinates)[:, 0]
+    diffs = np.diff(x_coords)
+    return np.all(diffs != 1)
+
+
+def check_lines_continuous(line_coordinates_dict: dict) -> None:
+    """Checks all the labeled lines in a dictionary for continuity
+
+    Args:
+        line_coordinates_dict (dict): The dictionary with the line label as the key and the value a list of coordinates
+    """
+    for label, coordinates in line_coordinates_dict.items():
+        is_continuous = check_continuous(coordinates)
+        if is_continuous:
+            print(f"Line {label} is not continuous.")
 
 
 def boundary_image(img: np.array) -> np.array:

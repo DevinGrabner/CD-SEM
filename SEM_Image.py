@@ -86,10 +86,12 @@ class SEMImageDetails:
         self.midlevel = edges.threshold_level(self.image_flat, 0.6)
         self.image_binary = edges.blackwhite_image(self.image_flat, self.midlevel)
 
-        # Now removing defects and finding line edges
-        self.image_boundaries = edges.boundary_image(edges.remove_defects(np.copy(self.image_binary)))
-        self.image_boundaries = edges.remove_defects(self.image_boundaries)
-
+        # # Now removing defects and finding line edges
+        # self.image_boundaries = edges.boundary_image(edges.remove_defects(np.copy(self.image_binary)))
+        # self.image_boundaries = edges.remove_defects(self.image_boundaries)
+        self.image_boundaries = edges.remove_defects(self.image_binary)
+        tools.simple_image_display(self.image_binary, "binary w/o defects")
+        tools.simple_image_display(self.image_boundaries, "Boundaries w/o defects")
         # Clean and straighten the image with the edge boundaries
         self.rotate_angle = edges.avg_rotation(self.image_boundaries)
         self.image_binary = edges.trim_rotation(
@@ -97,15 +99,13 @@ class SEMImageDetails:
         )
 
         # Now that the binary image has been straightened we have to redo the line detection and line defect removal because the rotation of sigle pixel wide lines doesn't map correctly.
-        self.image_boundaries = edges.boundary_image(edges.remove_defects(np.copy(self.image_binary), crop = 0))
-        self.image_boundaries = edges.remove_defects(self.image_boundaries, crop=0)
-        # tools.simple_image_display(self.image_binary, "binary w/o defects")
-        # tools.simple_image_display(self.image_boundaries, "Boundaries w/o defects")
-
+        self.image_boundaries = edges.remove_defects(self.image_binary)
         self.boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
-        print(self.boundaries)
+        edges.check_lines_continuous(self.boundaries)
         tools.simple_image_display(self.image_binary, "Binary")
-        tools.simple_image_display(edges.blackwhite_image(np.copy(self.image_boundaries),0.5), "Boundaries")
+        tools.simple_image_display(
+            edges.blackwhite_image(np.copy(self.image_boundaries), 0.5), "Boundaries"
+        )
         # self.bw_order = edges.edge_boundary_order(
         #     self.image_binary, self.boundaries
         # )
