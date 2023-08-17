@@ -256,7 +256,7 @@ def boundary_edges(boundary_img: np.array) -> dict:
     return lines
 
 
-def edge_boundary_order(binary_img: np.array, lines: dict) -> str:
+def edge_boundary_order(binary_img: np.array, lines: dict) -> dict:
     """Returns a string defining whether it is a white are black space between the first two lines, defining the begining of the alternating pattern.
 
     Args:
@@ -264,28 +264,35 @@ def edge_boundary_order(binary_img: np.array, lines: dict) -> str:
         lines (dict): Dictionary of coordinate position of boundary edges
 
     Returns:
-        str: "white" or "black"
+        dict: Key is the line edge label and the value is whether the space between line 'n' and 'n+1' is black or white
     """
-    # Line coords for Line 1 and Line 2
-    line1_coords = lines["Line 1"]
-    line2_coords = lines["Line 2"]
+    bw_label = {label: [] for label in lines}
 
-    # Gets the x coordinate for the the line at about the center of the image
-    middle_pixel_line1 = (line1_coords[10])[1]
-    middle_pixel_line2 = (line2_coords[10])[1]
+    labels = list(lines.keys())
 
-    # Calculate the pixel halfway between the lines
-    midpoint_x = int((middle_pixel_line1 + middle_pixel_line2) // 2)
+    # Iterate through each line pair
+    for label_1, label_2 in zip(labels, labels[1:]):
+        # Line coords for Line 1 and Line 2
+        line1_coords = lines[label_1]
+        line2_coords = lines[label_2]
 
-    # Get the value at the pixel located at midpoint_coordinates from the binary_img
-    value_at_midpoint = binary_img[(line1_coords[10])[0], midpoint_x]
+        # Gets the x coordinate for the the line at about the center of the image
+        middle_pixel_line1 = (line1_coords[10])[1]
+        middle_pixel_line2 = (line2_coords[10])[1]
 
-    if value_at_midpoint == 1:
-        print("The space between lines 1 and 2 is a 'white' space")
-        return "white"
-    elif value_at_midpoint == 0:
-        print("The space between lines 1 and 2 is a 'black' space")
-        return "black"
+        # Calculate the pixel halfway between the lines
+        midpoint_x = int((middle_pixel_line1 + middle_pixel_line2) // 2)
+
+        # Get the value at the pixel located at midpoint_coordinates from the binary_img
+        value_at_midpoint = binary_img[(line1_coords[10])[0], midpoint_x]
+
+        if value_at_midpoint == 1:
+            value = "white"
+        elif value_at_midpoint == 0:
+            value = "black"
+        bw_label[label_1].append(value)
+
+    return bw_label
 
 
 def display_overlay(

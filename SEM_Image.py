@@ -43,7 +43,7 @@ class SEMImageDetails:
         self.peakposition: np.array | None = None
         self.midlevel: float | None = None
         self.boundaries: dict | None = None
-        self.bw_order: str | None = None
+        self.bw_order: dict | None = None
 
         # Images
         self.image = tifffile.imread(self.path)  # Original
@@ -106,9 +106,7 @@ class SEMImageDetails:
         tools.simple_image_display(
             edges.blackwhite_image(np.copy(self.image_boundaries), 0.5), "Boundaries"
         )
-        # self.bw_order = edges.edge_boundary_order(
-        #     self.image_binary, self.boundaries
-        # )
+        self.bw_order = edges.edge_boundary_order(self.image_binary, self.boundaries)
         edges.display_overlay(
             edges.blackwhite_image(np.copy(self.image_boundaries), 0.5),
             np.copy(self.image_binary),
