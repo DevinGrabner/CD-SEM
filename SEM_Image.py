@@ -53,6 +53,7 @@ class SEMImageDetails:
         self.image_flat = None  # Flattened image
         self.image_binary = None  # Black and White Binary image
         self.image_boundaries = None  # Binary Boundary image
+        self.rotated_boundaries = None # Fractional coordinates of rotated image
 
     def __call__(self):
         # These operations have to deal with extracting information from the original SEM image, rotating it if it is tilted, and applying a frequency filter
@@ -62,7 +63,7 @@ class SEMImageDetails:
         self.image_clipped = tools.clip_image(
             FFTcalc.extract_center_part(self.image, self.lmax)
         )
-        self.display_SEM_image(self.image_clipped, bar=True, title="Clipped SEM Image")
+        self.display_SEM_image(self.image_clipped, bar=True, title="SEM Image")
 
         self.image_PDS, self.image_PDS_center = FFTcalc.PDS_img(self.image_clipped)
         ###        self.display_fft_image(self.image_PDS, title="Power Spectral Density")
@@ -85,28 +86,30 @@ class SEMImageDetails:
         # These operations have to deal with threasholding, binary filter
         self.midlevel = edges.threshold_level(self.image_flat, 0.6)
         self.image_binary = edges.blackwhite_image(self.image_flat, self.midlevel)
+        tools.simple_image_display(self.image_binary, "Original Binary Image")
 
-        # # Now removing defects and finding line edges
-        # self.image_boundaries = edges.boundary_image(edges.remove_defects(np.copy(self.image_binary)))
-        # self.image_boundaries = edges.remove_defects(self.image_boundaries)
+        # Now removing defects and finding line edges
         self.image_boundaries = edges.remove_defects(self.image_binary)
-        tools.simple_image_display(self.image_binary, "binary w/o defects")
-        tools.simple_image_display(self.image_boundaries, "Boundaries w/o defects")
+        self.rotated_boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
+
         # Clean and straighten the image with the edge boundaries
         self.rotate_angle = edges.avg_rotation(self.image_boundaries)
         self.image_binary = edges.trim_rotation(
             tools.rotate_image(self.image_binary, self.rotate_angle), self.rotate_angle
         )
 
+
+
+
+
+
         # Now that the binary image has been straightened we have to redo the line detection and line defect removal because the rotation of sigle pixel wide lines doesn't map correctly.
         self.image_boundaries = edges.remove_defects(self.image_binary)
-        self.boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
-        edges.check_lines_continuous(self.boundaries)
-        tools.simple_image_display(self.image_binary, "Binary")
-        tools.simple_image_display(
-            edges.blackwhite_image(np.copy(self.image_boundaries), 0.5), "Boundaries"
-        )
+
+        tools.simple_image_display(self.image_binary, "Straightend Binary")
+        tools.simple_image_display(self.image_boundaries, "Edge Boundaries")
         self.bw_order = edges.edge_boundary_order(self.image_binary, self.boundaries)
+        #print(self.bw_order)
         edges.display_overlay(
             edges.blackwhite_image(np.copy(self.image_boundaries), 0.5),
             np.copy(self.image_binary),
@@ -114,11 +117,12 @@ class SEMImageDetails:
             10,
         )
 
-        # self.fitpitch = edges.pitch_fit(self.boundaries, (self.pix_size * self.pix_scale))
+        ## NEEDS FIXED ###self.fitpitch = edges.pitch_fit(self.boundaries, (self.pix_size * self.pix_scale))
 
         # These operations have to deal with LER, LWR, LPR
 
-        # anly.LER(self.boundaries, (self.pix_scale * self.pix_size))
+        anly.LER(self.boundaries, (self.pix_scale * self.pix_size))
+        anly.LWR(self.boundaries, (self.pix_scale * self.pix_size))
 
         # These operations have to deal with statistical line analysis
 

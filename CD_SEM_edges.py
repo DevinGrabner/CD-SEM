@@ -134,7 +134,7 @@ def remove_defects(binary_image: np.array, crop: int = 5) -> np.array:
     return cleaned_image
 
 
-def check_continuous(coordinates: list) -> bool:
+def check_continuous(coordinates: list[tuple]) -> bool:
     """Checks if a list of coordinates are continuous
 
     Args:
@@ -148,7 +148,7 @@ def check_continuous(coordinates: list) -> bool:
     return np.all(diffs != 1)
 
 
-def check_lines_continuous(line_coordinates_dict: dict) -> None:
+def check_lines_continuous(line_coordinates_dict: dict[str, list[tuple]]) -> None:
     """Checks all the labeled lines in a dictionary for continuity
 
     Args:
@@ -198,7 +198,7 @@ def avg_rotation(boundary_img: np.array) -> float:
     return avg_rotation_angle
 
 
-def calculate_rotation_angle(points: list) -> float:
+def calculate_rotation_angle(points: list[tuple]) -> float:
     """Fits a linear line the input boundary edge and calculates the tilt angle
 
     Args:
@@ -234,7 +234,7 @@ def trim_rotation(image: np.array, angle_rad: float) -> np.array:
     return trimmed_img
 
 
-def boundary_edges(boundary_img: np.array) -> dict:
+def boundary_edges(boundary_img: np.array) -> dict[str, list[tuple]]:
     """Takes the cleaned edge boundary image and returns a dictionary with with the coordinates
       of all the points making up a line is made and returned.
 
@@ -255,8 +255,36 @@ def boundary_edges(boundary_img: np.array) -> dict:
 
     return lines
 
+def rotate_edges(line_coordinates_dict: dict[str, list[tuple]], angle: float, center: tuple) -> dict[str, list[tuple]]:
+    """Rotates all the coordinates for each boundary line about the center of the boundaries SEM image by a specified angle
 
-def edge_boundary_order(binary_img: np.array, lines: dict) -> dict:
+    Args:
+        line_coordinates_dict (dict[str, list[tuple]]): Dictionary of the line number and the coordinates of the line
+        angle (float): Angle in radians the line needs rotated
+        center (tuple): Center of the boundaries SEM image
+
+    Returns:
+        dict[str, list[tuple]]: Dictionary of the line number and coordinates of the rotated lines
+    """
+    center = (center[0]/2 - 0.5, center[1]/2 - 0.5) #(row, column)
+
+    cos_theta = np.cos(angle)
+    sin_theta = np.sin(angle)
+    
+    def apply_rotation(coordinates):
+        return [((x - center[1]) * cos_theta - (y - center[0]) * sin_theta + center[1],
+                 (x - center[1]) * sin_theta + (y - center[0]) * cos_theta + center[0])
+                for y, x in coordinates]
+    
+    rotated_dict = {key: apply_rotation(coordinates)
+                    for key, coordinates in line_coordinates_dict.items()}
+    
+    return rotated_dict
+
+
+def edge_boundary_order(
+    binary_img: np.array, lines: dict[str, list[tuple]]
+) -> dict[str, list[tuple]]:
     """Returns a string defining whether it is a white are black space between the first two lines, defining the begining of the alternating pattern.
 
     Args:
@@ -322,7 +350,7 @@ def display_overlay(
     plt.show()
 
 
-def pitch_fit(lines: dict, scale: float) -> float:
+def pitch_fit(lines: dict[str, list[tuple]], scale: float) -> float:
     """Caclulates and returns the pitch of the grating lines
 
     Args:
