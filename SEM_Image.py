@@ -42,7 +42,10 @@ class SEMImageDetails:
 
         self.peakposition: np.array | None = None
         self.midlevel: float | None = None
-        self.boundaries: dict | None = None
+        self.grid_boundaries: dict | None = None
+        self.rotated_boundaries: dict | None = (
+            None  # Fractional coordinates of rotated image
+        )
         self.bw_order: dict | None = None
 
         # Images
@@ -53,7 +56,6 @@ class SEMImageDetails:
         self.image_flat = None  # Flattened image
         self.image_binary = None  # Black and White Binary image
         self.image_boundaries = None  # Binary Boundary image
-        self.rotated_boundaries = None # Fractional coordinates of rotated image
 
     def __call__(self):
         # These operations have to deal with extracting information from the original SEM image, rotating it if it is tilted, and applying a frequency filter
@@ -90,26 +92,27 @@ class SEMImageDetails:
 
         # Now removing defects and finding line edges
         self.image_boundaries = edges.remove_defects(self.image_binary)
-        self.rotated_boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
 
         # Clean and straighten the image with the edge boundaries
         self.rotate_angle = edges.avg_rotation(self.image_boundaries)
         self.image_binary = edges.trim_rotation(
             tools.rotate_image(self.image_binary, self.rotate_angle), self.rotate_angle
         )
+        self.grid_boundaries = edges.boundary_edges(np.copy(self.image_binary))
 
+        # Make boundary coordinate dictionary, rotate to fractional coordinates, trim to same begin and end row coordinates
+        self.rotated_boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
+        self.rotated_boundaries = edges.rotate_edges(
+            self.rotated_boundaries, self.rotate_angle, (self.image_boundaries).shape
+        )
 
-
-
-
-
-        # Now that the binary image has been straightened we have to redo the line detection and line defect removal because the rotation of sigle pixel wide lines doesn't map correctly.
+        # Now that the binary image has been straightened we have to redo the line detection and line defect removal because the rotation of sigle pixel wide lines doesn't map well for visulization
         self.image_boundaries = edges.remove_defects(self.image_binary)
 
         tools.simple_image_display(self.image_binary, "Straightend Binary")
         tools.simple_image_display(self.image_boundaries, "Edge Boundaries")
         self.bw_order = edges.edge_boundary_order(self.image_binary, self.boundaries)
-        #print(self.bw_order)
+        # print(self.bw_order)
         edges.display_overlay(
             edges.blackwhite_image(np.copy(self.image_boundaries), 0.5),
             np.copy(self.image_binary),

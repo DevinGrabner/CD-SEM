@@ -255,8 +255,13 @@ def boundary_edges(boundary_img: np.array) -> dict[str, list[tuple]]:
 
     return lines
 
-def rotate_edges(line_coordinates_dict: dict[str, list[tuple]], angle: float, center: tuple) -> dict[str, list[tuple]]:
-    """Rotates all the coordinates for each boundary line about the center of the boundaries SEM image by a specified angle
+
+def rotate_edges(
+    line_coordinates_dict: dict[str, list[tuple]], angle: float, center: tuple
+) -> dict[str, list[tuple]]:
+    """Rotates all the coordinates for each boundary line about the center of the boundaries SEM image by a specified angle.
+        After rotation the boundary lines are compared and trimmed so that they are the same length and begin and end at the
+        same row index.
 
     Args:
         line_coordinates_dict (dict[str, list[tuple]]): Dictionary of the line number and the coordinates of the line
@@ -266,19 +271,35 @@ def rotate_edges(line_coordinates_dict: dict[str, list[tuple]], angle: float, ce
     Returns:
         dict[str, list[tuple]]: Dictionary of the line number and coordinates of the rotated lines
     """
-    center = (center[0]/2 - 0.5, center[1]/2 - 0.5) #(row, column)
+    center = (center[0] / 2 - 0.5, center[1] / 2 - 0.5)  # (row, column)
 
     cos_theta = np.cos(angle)
     sin_theta = np.sin(angle)
-    
+
     def apply_rotation(coordinates):
-        return [((x - center[1]) * cos_theta - (y - center[0]) * sin_theta + center[1],
-                 (x - center[1]) * sin_theta + (y - center[0]) * cos_theta + center[0])
-                for y, x in coordinates]
+        return [
+            (
+                (x - center[1]) * cos_theta - (y - center[0]) * sin_theta + center[1],
+                (x - center[1]) * sin_theta + (y - center[0]) * cos_theta + center[0],
+            )
+            for y, x in coordinates
+        ]
+
+    rotated_dict = {
+        key: apply_rotation(coordinates)
+        for key, coordinates in line_coordinates_dict.items()
+    }
+
+    # Find the minimum and maximum row values among the rotated coordinates
+    min_row = max(np.min(rotated_coords[:, 0]) for rotated_coords in rotated_dict.values())
+    max_row = min(np.max(rotated_coords[:, 0]) for rotated_coords in rotated_dict.values())
     
-    rotated_dict = {key: apply_rotation(coordinates)
-                    for key, coordinates in line_coordinates_dict.items()}
-    
+    # Trim the rotated coordinates to have the same length and starting/ending row coordinate
+    for key in rotated_dict:
+        rotated_coords = rotated_dict[key]
+        mask = (rotated_coords[:, 0] >= min_row) & (rotated_coords[:, 0] <= max_row)
+        rotated_dict[key] = rotated_coords[mask]
+
     return rotated_dict
 
 
