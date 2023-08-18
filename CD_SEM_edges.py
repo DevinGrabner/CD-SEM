@@ -1,5 +1,4 @@
 import CD_SEM_tools as tools
-import CD_SEM_FFT as FFTcalc
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage import filters, segmentation, morphology, util
@@ -18,7 +17,7 @@ def threshold_level(image: np.array, thresh: float) -> float:
         float: The weighted midpoint between the black and white levels
     """
     # Histogram of flattend input image
-    histdata, bins = np.histogram(image.flatten(), bins=256, range=(0, 1))
+    histdata, bins = np.histogram(image.flatten(), bins=128, range=(0, 1))
     bin_centers = 0.5 * (bins[1:] + bins[:-1])
 
     # Smooth the histogram using a moving average
@@ -88,6 +87,30 @@ def blackwhite_image(img: np.array, midlevel: float) -> np.array:
 
     return bw_image
 
+def column_sums(img: np.array) -> list:
+    """Sums all the columns of the rotated and trimmed binary image so that the line even with breaks can be properly numbered
+
+    Args:
+        img (np.array): binarized, rotated, and trimmed SEM image
+
+    Returns:
+        list: Sum of all the columns in the image
+    """
+    # Sum the columns along axis 0
+    column_sums = img.sum(axis=0)
+
+    # Convert the column sums to a Python list
+    column_sums_list = column_sums.tolist()
+
+    # Create a bar plot to visualize the column sums
+    plt.figure(figsize=(20, 20))
+    plt.bar(range(len(column_sums_list)), column_sums_list, tick_label=[f'Column {i+1}' for i in range(len(column_sums_list))])
+    plt.xlabel('Columns')
+    plt.ylabel('Sum')
+    plt.title('Sum of Image Lines')
+    plt.show()
+
+    return column_sums_list
 
 def remove_defects(binary_image: np.array, crop: int = 5) -> np.array:
     """Removes all lines that are invloved with a defect in the SEM grating image
@@ -276,7 +299,15 @@ def rotate_edges(
     cos_theta = np.cos(angle)
     sin_theta = np.sin(angle)
 
-    def apply_rotation(coordinates):
+    def apply_rotation(coordinates: list[tuple]) -> list[tuple]:
+        """Rotates all the coordinates in a list of coordinates by theta
+
+        Args:
+            coordinates (list[tuple]): list of (y,x) coordinate pairs
+
+        Returns:
+            list[tuple]: list of fractional (y,x) coordinate pairs
+        """
         return [
             (
                 (x - center[1]) * cos_theta - (y - center[0]) * sin_theta + center[1],
@@ -291,9 +322,13 @@ def rotate_edges(
     }
 
     # Find the minimum and maximum row values among the rotated coordinates
-    min_row = max(np.min(rotated_coords[:, 0]) for rotated_coords in rotated_dict.values())
-    max_row = min(np.max(rotated_coords[:, 0]) for rotated_coords in rotated_dict.values())
-    
+    min_row = max(
+        np.min(rotated_coords[:, 0]) for rotated_coords in rotated_dict.values()
+    )
+    max_row = min(
+        np.max(rotated_coords[:, 0]) for rotated_coords in rotated_dict.values()
+    )
+
     # Trim the rotated coordinates to have the same length and starting/ending row coordinate
     for key in rotated_dict:
         rotated_coords = rotated_dict[key]

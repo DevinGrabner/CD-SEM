@@ -42,6 +42,7 @@ class SEMImageDetails:
 
         self.peakposition: np.array | None = None
         self.midlevel: float | None = None
+        self.column_sum: list | None = None
         self.grid_boundaries: dict | None = None
         self.rotated_boundaries: dict | None = (
             None  # Fractional coordinates of rotated image
@@ -88,7 +89,7 @@ class SEMImageDetails:
         # These operations have to deal with threasholding, binary filter
         self.midlevel = edges.threshold_level(self.image_flat, 0.6)
         self.image_binary = edges.blackwhite_image(self.image_flat, self.midlevel)
-        tools.simple_image_display(self.image_binary, "Original Binary Image")
+            #tools.simple_image_display(self.image_binary, "Original Binary Image")
 
         # Now removing defects and finding line edges
         self.image_boundaries = edges.remove_defects(self.image_binary)
@@ -98,7 +99,8 @@ class SEMImageDetails:
         self.image_binary = edges.trim_rotation(
             tools.rotate_image(self.image_binary, self.rotate_angle), self.rotate_angle
         )
-        self.grid_boundaries = edges.boundary_edges(np.copy(self.image_binary))
+
+        self.column_sum = edges.column_sums(self.image_binary)
 
         # Make boundary coordinate dictionary, rotate to fractional coordinates, trim to same begin and end row coordinates
         self.rotated_boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
@@ -108,11 +110,9 @@ class SEMImageDetails:
 
         # Now that the binary image has been straightened we have to redo the line detection and line defect removal because the rotation of sigle pixel wide lines doesn't map well for visulization
         self.image_boundaries = edges.remove_defects(self.image_binary)
-
-        tools.simple_image_display(self.image_binary, "Straightend Binary")
-        tools.simple_image_display(self.image_boundaries, "Edge Boundaries")
-        self.bw_order = edges.edge_boundary_order(self.image_binary, self.boundaries)
-        # print(self.bw_order)
+        self.grid_boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
+            #tools.simple_image_display(self.image_binary, "Straightend Binary")
+            #tools.simple_image_display(self.image_boundaries, "Edge Boundaries")
         edges.display_overlay(
             edges.blackwhite_image(np.copy(self.image_boundaries), 0.5),
             np.copy(self.image_binary),
@@ -120,12 +120,17 @@ class SEMImageDetails:
             10,
         )
 
+        self.bw_order = edges.edge_boundary_order(
+            self.image_binary, self.grid_boundaries
+        )
+        # print(self.bw_order)
+
         ## NEEDS FIXED ###self.fitpitch = edges.pitch_fit(self.boundaries, (self.pix_size * self.pix_scale))
 
         # These operations have to deal with LER, LWR, LPR
 
-        anly.LER(self.boundaries, (self.pix_scale * self.pix_size))
-        anly.LWR(self.boundaries, (self.pix_scale * self.pix_size))
+        # anly.LER(self.boundaries, (self.pix_scale * self.pix_size))
+        # anly.LWR(self.boundaries, (self.pix_scale * self.pix_size))
 
         # These operations have to deal with statistical line analysis
 
