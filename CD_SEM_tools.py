@@ -1,6 +1,6 @@
 import tkinter as tk
 import numpy as np
-from skimage import transform
+from skimage import filters
 import matplotlib.pyplot as plt
 from scipy.stats import scoreatpercentile
 from scipy.ndimage import rotate
@@ -15,7 +15,7 @@ def open_window():
     root.focus_force()
 
 
-def rescale_array(arr: np.array, new_min: float = 0, new_max: float = 1) -> np.array:
+def rescale_array(arr: np.ndarray, new_min: float = 0, new_max: float = 1) -> np.ndarray:
     """Rescales the input array between the new_min and new_max values provided
 
     Args:
@@ -36,8 +36,31 @@ def rescale_array(arr: np.array, new_min: float = 0, new_max: float = 1) -> np.a
     )  # Rescale to the new range
     return rescaled_arr
 
+def blackwhite_image(img: np.ndarray, midlevel: float) -> np.ndarray:
+    """Takes and image and turns it into an array of 0's and 1's based on the input threshold
 
-def clip_image(img: np.array) -> np.array:
+    Args:
+        img (np.ndarray): Flattend image that need binarized
+        midlevel (float): The cut off for deciding if the pixel should be a 0 or 1
+
+    Returns:
+        np.ndarray: Binarized version of the input image
+    """
+    # Threshold the image using a midlevel value
+    binary_image = (np.where(img >= midlevel, 1, 0)).astype(np.uint8)
+
+    # Apply Gaussian filter to the binary image
+    sigma = (8, 2)
+    smoothed_image = filters.gaussian(
+        binary_image, sigma=sigma, mode="constant", cval=0
+    )
+    smoothed_image = rescale_array(smoothed_image)
+    # Threshold the smoothed image using another threshold value
+    bw_image = (np.where(smoothed_image >= 0.5, 1, 0)).astype(np.uint8)
+
+    return bw_image
+
+def clip_image(img: np.ndarray) -> np.ndarray:
     """Takes the input image and clips it between 0.05% and 99.95% of it origonal values.
     The clipped image is then rescaled between 0 and 1
 
@@ -45,22 +68,22 @@ def clip_image(img: np.array) -> np.array:
         img (np.ndarray): The 2D array that makes up the SEM image
 
     Returns:
-        np.array: clipped and rescale image
+        np.ndarray: clipped and rescale image
     """
     xlow = scoreatpercentile(img, 0.05)
     xhigh = scoreatpercentile(img, 99.95)
     return rescale_array(np.clip(np.copy(img), xlow, xhigh))
 
 
-def rotate_image(image: np.array, angle: float) -> np.array:
+def rotate_image(image: np.ndarray, angle: float) -> np.ndarray:
     """Takes the input image and rotates it by the given angle around the center pixel
 
     Args:
-        image (np.array): image that needs rotated
+        image (np.ndarray): image that needs rotated
         angle (float): angle in radians of needed rotation
 
     Returns:
-        np.array: rotated image
+        np.ndarray: rotated image
     """
     # Perform the rotation around the center
     rotated_image = rotate(
@@ -70,16 +93,16 @@ def rotate_image(image: np.array, angle: float) -> np.array:
     return rotated_image
 
 
-def pad_vector_to_match_length(vector: np.array, target_vector: np.array) -> np.array:
+def pad_vector_to_match_length(vector: np.ndarray, target_vector: np.ndarray) -> np.ndarray:
     """Takes a vector and evenly added zeros to either end until it is the same
         length as the 'taget_vector'
 
     Args:
-        vector (np.array): vector that needs padded
-        target_vector (np.array): longer vector with the target length
+        vector (np.ndarray): vector that needs padded
+        target_vector (np.ndarray): longer vector with the target length
 
     Returns:
-        np.array: input vector padded with zeros
+        np.ndarray: input vector padded with zeros
     """
     target_length = len(target_vector)
     current_length = len(vector)
@@ -91,11 +114,11 @@ def pad_vector_to_match_length(vector: np.array, target_vector: np.array) -> np.
     return np.pad(vector, (pad_before, pad_after), mode="constant", constant_values=0)
 
 
-def simple_image_display(img: np.array, title: str) -> None:
-    """Simple display of an np.array with a title
+def simple_image_display(img: np.ndarray, title: str) -> None:
+    """Simple display of an np.ndarray with a title
 
     Args:
-        img (np.array): Array to display
+        img (np.ndarray): Array to display
         title (str): Title of image
     """
     plt.figure(figsize=(10, 10))
@@ -144,3 +167,21 @@ def linear_fit(points: list) -> tuple[float, float]:
     A = np.vstack([x, np.ones(len(x))]).T
     m, c = np.linalg.lstsq(A, y, rcond=None)[0]
     return m, c
+
+def list_barplot(list: list | np.ndarray) -> None:
+    """Displays a barplot of the provided list
+
+    Args:
+        list (list): list or np.ndarray to plot
+    """
+    # Create a bar plot to visualize the column sums
+    plt.figure(figsize=(15, 15))
+    plt.bar(
+        range(len(list)),
+        list,
+        tick_label=[f"Column {i+1}" for i in range(len(list))],
+    )
+    plt.xlabel("Columns")
+    plt.ylabel("Sum")
+    plt.title("Sum of Image Lines")
+    plt.show()

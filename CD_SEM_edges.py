@@ -1,16 +1,17 @@
 import CD_SEM_tools as tools
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
 from skimage import filters, segmentation, morphology, util
 from skimage.measure import label, regionprops
 
 
-def threshold_level(image: np.array, thresh: float) -> float:
+def threshold_level(image: np.ndarray, thresh: float) -> float:
     """Take input of a grayscale image and a threshold weight. Using an intensity histogram
         a weighted cutlevel for binarizing the image can be established.
 
     Args:
-        image (np.array): Image that need a threashold found for
+        image (np.ndarray): Image that need a threashold found for
         thresh (float): Allows for an adjustment to weighting between the black and white lines
 
     Returns:
@@ -57,70 +58,31 @@ def threshold_level(image: np.array, thresh: float) -> float:
     return cutlevel
 
 
-def blackwhite_image(img: np.array, midlevel: float) -> np.array:
-    """Takes and image and turns it into an array of 0's and 1's based on the input threshold
-
-    Args:
-        img (np.array): Flattend image that need binarized
-        midlevel (float): The cut off for deciding if the pixel should be a 0 or 1
-
-    Returns:
-        np.array: Binarized version of the input image
-    """
-    # Threshold the image using a midlevel value
-    binary_image = (np.where(img >= midlevel, 1, 0)).astype(np.uint8)
-
-    # Apply Gaussian filter to the binary image
-    sigma = (8, 2)
-    smoothed_image = filters.gaussian(
-        binary_image, sigma=sigma, mode="constant", cval=0
-    )
-    smoothed_image = tools.rescale_array(smoothed_image)
-    # Threshold the smoothed image using another threshold value
-    bw_image = (np.where(smoothed_image >= 0.5, 1, 0)).astype(np.uint8)
-
-    # Introduce a broken gap defect artificially (uncomment the following lines to apply the defect)
-    # bw_image[20:31, 550:601] = 1
-
-    # Display the result
-    # tools.simple_image_display(bw_image, "Binary SEM Image")
-
-    return bw_image
-
-def column_sums(img: np.array) -> list:
+def column_sums(img: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Sums all the columns of the rotated and trimmed binary image so that the line even with breaks can be properly numbered
 
     Args:
-        img (np.array): binarized, rotated, and trimmed SEM image
+        img (np.ndarray): binarized, rotated, and trimmed SEM image
 
     Returns:
-        list: Sum of all the columns in the image
+        np.ndarray: Sum of all the columns in the image
     """
     # Sum the columns along axis 0
-    column_sums = img.sum(axis=0)
+    column_sums = img.sum(axis=1)
+    peaks = find_peaks(column_sums)[0]
 
-    # Convert the column sums to a Python list
-    column_sums_list = column_sums.tolist()
+    return (column_sums, peaks)
 
-    # Create a bar plot to visualize the column sums
-    plt.figure(figsize=(20, 20))
-    plt.bar(range(len(column_sums_list)), column_sums_list, tick_label=[f'Column {i+1}' for i in range(len(column_sums_list))])
-    plt.xlabel('Columns')
-    plt.ylabel('Sum')
-    plt.title('Sum of Image Lines')
-    plt.show()
 
-    return column_sums_list
-
-def remove_defects(binary_image: np.array, crop: int = 5) -> np.array:
+def remove_defects(binary_image: np.ndarray, crop: int = 5) -> np.ndarray:
     """Removes all lines that are invloved with a defect in the SEM grating image
 
     Args:
-        binary_image (np.array): binary image of the grating that needs processed
+        binary_image (np.ndarray): binary image of the grating that needs processed
         crop (int, optional): Number of pixels cropped from the edge to midigate edge effects from the FFT. Defaults to 5.
 
     Returns:
-        np.array: labeled boundary image
+        np.ndarray: labeled boundary image
     """
     img = util.crop(np.copy(binary_image), ((crop, crop), (crop, crop)))
 
@@ -183,29 +145,28 @@ def check_lines_continuous(line_coordinates_dict: dict[str, list[tuple]]) -> Non
             print(f"Line {label} is not continuous.")
 
 
-def boundary_image(img: np.array) -> np.array:
+def boundary_image(img: np.ndarray) -> np.ndarray:
     """Taken a binary image and returns single pixel width lines that correspond
         to the outside edges of the edges of the white lines.
 
     Args:
-        img (np.array): Binary image to find line edges on
+        img (np.ndarray): Binary image to find line edges on
 
     Returns:
-        np.array: array of single pixel width boundary lines
+        np.ndarray: array of single pixel width boundary lines
     """
-    # Apply Canny edge detector to find edges
+    # Apply segmentation edge detector to find edges
     edges = segmentation.find_boundaries(img, mode="outer", background=0).astype(
         np.uint8
     )
-    edges = (np.where(tools.rescale_array(edges) >= 0.5, 1, 0)).astype(np.uint8)
     return edges
 
 
-def avg_rotation(boundary_img: np.array) -> float:
+def avg_rotation(boundary_img: np.ndarray) -> float:
     """Caclulates the average tilt of all the lines in the SEM image
 
     Args:
-        boundary_img (np.array): binarized SEM image that need rotated
+        boundary_img (np.ndarray): binarized SEM image that need rotated
 
     Returns:
         float: The average angle in radian that the lines are tilted
@@ -238,15 +199,15 @@ def calculate_rotation_angle(points: list[tuple]) -> float:
     return angle_rad
 
 
-def trim_rotation(image: np.array, angle_rad: float) -> np.array:
+def trim_rotation(image: np.ndarray, angle_rad: float) -> np.ndarray:
     """Trims up the rotated image so that the lines exent the full length. They need to all overlap so that further statistical analysis can be done.
 
     Args:
-        image (np.array): Image that needs trimmed
+        image (np.ndarray): Image that needs trimmed
         angle_rad (float): The angle it was rotated at. Used to calculate how much to trim
 
     Returns:
-        np.array: trimmed array
+        np.ndarray: trimmed array
     """
     width = image.shape[1]
     pix = int(width * np.tan(abs(angle_rad)))
@@ -257,12 +218,12 @@ def trim_rotation(image: np.array, angle_rad: float) -> np.array:
     return trimmed_img
 
 
-def boundary_edges(boundary_img: np.array) -> dict[str, list[tuple]]:
+def boundary_edges(boundary_img: np.ndarray) -> dict[str, list[tuple]]:
     """Takes the cleaned edge boundary image and returns a dictionary with with the coordinates
       of all the points making up a line is made and returned.
 
     Args:
-        boundary_img (np.array): Cleaned edge boundary image
+        boundary_img (np.ndarray): Cleaned edge boundary image
 
     Returns:
         dict: dictionary of the labeled boundary edge lines. Keyword "Line #": Value(List of points that make up the line)
@@ -321,30 +282,38 @@ def rotate_edges(
         for key, coordinates in line_coordinates_dict.items()
     }
 
-    # Find the minimum and maximum row values among the rotated coordinates
-    min_row = max(
-        np.min(rotated_coords[:, 0]) for rotated_coords in rotated_dict.values()
+    # Find the minimum and maximum y values among the rotated coordinates
+    min_y = max(
+        [
+            min(coord[0] for coord in rotated_coords)
+            for rotated_coords in rotated_dict.values()
+        ]
     )
-    max_row = min(
-        np.max(rotated_coords[:, 0]) for rotated_coords in rotated_dict.values()
+    max_y = min(
+        [
+            max(coord[0] for coord in rotated_coords)
+            for rotated_coords in rotated_dict.values()
+        ]
     )
 
     # Trim the rotated coordinates to have the same length and starting/ending row coordinate
     for key in rotated_dict:
         rotated_coords = rotated_dict[key]
-        mask = (rotated_coords[:, 0] >= min_row) & (rotated_coords[:, 0] <= max_row)
-        rotated_dict[key] = rotated_coords[mask]
+        filtered_coords = [
+            coord for coord in rotated_coords if min_y <= coord[0] <= max_y
+        ]
+        rotated_dict[key] = filtered_coords
 
     return rotated_dict
 
 
 def edge_boundary_order(
-    binary_img: np.array, lines: dict[str, list[tuple]]
+    binary_img: np.ndarray, lines: dict[str, list[tuple]]
 ) -> dict[str, list[tuple]]:
     """Returns a string defining whether it is a white are black space between the first two lines, defining the begining of the alternating pattern.
 
     Args:
-        binary_img (np.array): The black and white rotated binary image
+        binary_img (np.ndarray): The black and white rotated binary image
         lines (dict): Dictionary of coordinate position of boundary edges
 
     Returns:
@@ -380,13 +349,13 @@ def edge_boundary_order(
 
 
 def display_overlay(
-    top_image: np.array, bottom_image: np.array, title: str, size: int
+    top_image: np.ndarray, bottom_image: np.ndarray, title: str, size: int
 ) -> None:
     """Displays and overlay of the two input images
 
     Args:
-        top_image (np.array): The image of the boundary lines
-        bottom_image (np.array): The Black and White image
+        top_image (np.ndarray): The image of the boundary lines
+        bottom_image (np.ndarray): The Black and White image
         title (str): Title of the image
         size (int): Size of the window to be produced
     """

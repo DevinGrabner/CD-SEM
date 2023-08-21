@@ -27,7 +27,7 @@ def image_size(
     return imax, lmax, kscale
 
 
-def extract_center_part(img: np.array, size: int) -> np.array:
+def extract_center_part(img: np.ndarray, size: int) -> np.ndarray:
     """Extracts a square submatrix of size "size" from the center part of the larger matrix "img"
     roi_w & roi_h = region of interest
 
@@ -45,7 +45,7 @@ def extract_center_part(img: np.array, size: int) -> np.array:
     return img[roi_h : int(roi_h + size), roi_w : int(roi_w + size)]
 
 
-def PDS_img(img: np.array) -> tuple[np.array, float]:
+def PDS_img(img: np.ndarray) -> tuple[np.ndarray, float]:
     """Calculates the magnitude squared of the Fourier Transform of a square image "img" of size "lmax".
     It recenters it so that the zero frequency is at {lmax/2+1, lmax/2+1}. It saves the magnitude square
     of the zero frequency in a variable called "ctrval". The zero frequncy in the image is replaced by "1" to help
@@ -66,7 +66,7 @@ def PDS_img(img: np.array) -> tuple[np.array, float]:
     return fimg, ctrval
 
 
-def rotated_angle(probe: int, img: np.array, lmax: int) -> float:
+def rotated_angle(probe: int, img: np.ndarray, lmax: int) -> float:
     """_summary_
 
     Args:
@@ -78,7 +78,7 @@ def rotated_angle(probe: int, img: np.array, lmax: int) -> float:
         float: angle the image needs rotated
     """
 
-    def calculatetotals(probe: int, img: np.array, lmax: int) -> np.array:
+    def calculatetotals(probe: int, img: np.ndarray, lmax: int) -> np.ndarray:
         totals = []
         for l in range(-probe, probe + 1):
             indices = np.array(
@@ -93,7 +93,7 @@ def rotated_angle(probe: int, img: np.array, lmax: int) -> float:
         totals = np.array(totals)
         return totals
 
-    def movingmedian(data: np.array, window_size: int) -> float:
+    def movingmedian(data: np.ndarray, window_size: int) -> float:
         padded_data = np.pad(data, (window_size - 1) // 2, mode="edge")
         windowed_data = np.lib.stride_tricks.sliding_window_view(
             padded_data, window_size
@@ -226,7 +226,7 @@ def fourier_pitch(img: object) -> float:
         )
 
 
-def disk_filter(r1: float, r2: float, imsize: float) -> np.array:
+def disk_filter(r1: float, r2: float, imsize: float) -> np.ndarray:
     """DiskFilter makes a bandpass filter in a square matrix of size "imsize" . The filter is an array of 1' s and 0' s.
     The position where there is a "1" mean that those frequencies will "pass" and where there is a "zero" frequencies will be "blocked".
     In the disk filter the array of 1' s and 0' s follows the radial assignment r1 and r2.
@@ -237,7 +237,7 @@ def disk_filter(r1: float, r2: float, imsize: float) -> np.array:
         imsize (float): _description_
 
     Returns:
-        np.array: _description_
+        np.ndarray: _description_
     """
     # Create a mesh grid to represent the Cartesian coordinates
     x, y = np.meshgrid(range(imsize), range(imsize))
@@ -261,14 +261,14 @@ def disk_filter(r1: float, r2: float, imsize: float) -> np.array:
     return filter
 
 
-def filter_img(img: object) -> np.array:
+def filter_img(img: object) -> np.ndarray:
     """_summary_
 
     Args:
         img (object): _description_
 
     Returns:
-        np.array: _description_
+        np.ndarray: _description_
     """
     # Sets the low and high frequency cutoffs
     fLow = 0.3 * 2 * np.pi / img.fitpitch / img.kscale

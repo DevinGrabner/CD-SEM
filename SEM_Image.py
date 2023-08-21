@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.fftpack import fftshift, fft2
-from skimage.measure import label
+from skimage import util
 import numpy as np
 import tifffile
 from tkinter import filedialog
@@ -40,7 +40,7 @@ class SEMImageDetails:
         )
         self.rotate_angle: None | float = None
 
-        self.peakposition: np.array | None = None
+        self.peakposition: np.ndarray | None = None
         self.midlevel: float | None = None
         self.column_sum: list | None = None
         self.grid_boundaries: dict | None = None
@@ -88,19 +88,18 @@ class SEMImageDetails:
 
         # These operations have to deal with threasholding, binary filter
         self.midlevel = edges.threshold_level(self.image_flat, 0.6)
-        self.image_binary = edges.blackwhite_image(self.image_flat, self.midlevel)
+        self.image_binary = tools.blackwhite_image(self.image_flat, self.midlevel)
             #tools.simple_image_display(self.image_binary, "Original Binary Image")
-
+        
         # Now removing defects and finding line edges
-        self.image_boundaries = edges.remove_defects(self.image_binary)
+        self.image_boundaries = edges.remove_defects(np.copy(self.image_binary))
 
         # Clean and straighten the image with the edge boundaries
-        self.rotate_angle = edges.avg_rotation(self.image_boundaries)
+        self.rotate_angle = edges.avg_rotation(np.copy(self.image_boundaries))
         self.image_binary = edges.trim_rotation(
             tools.rotate_image(self.image_binary, self.rotate_angle), self.rotate_angle
         )
-
-        self.column_sum = edges.column_sums(self.image_binary)
+        tools.simple_image_display(self.image_binary, "Straightend Binary Image")
 
         # Make boundary coordinate dictionary, rotate to fractional coordinates, trim to same begin and end row coordinates
         self.rotated_boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
@@ -109,12 +108,23 @@ class SEMImageDetails:
         )
 
         # Now that the binary image has been straightened we have to redo the line detection and line defect removal because the rotation of sigle pixel wide lines doesn't map well for visulization
-        self.image_boundaries = edges.remove_defects(self.image_binary)
+        self.image_boundaries = edges.remove_defects(np.copy(self.image_binary))
+       
+        linesum, peaks = edges.column_sums(util.crop(np.copy(self.image_binary), ((5, 5), (5, 5))))
+        print(len(peaks))
+        tools.list_barplot(linesum)
+        
+        self.column_sum, peaks_boundaries = edges.column_sums(np.copy(self.image_boundaries))
+        print(len(peaks_boundaries))
+        tools.list_barplot(self.column_sum)
+        # tools.list_barplot(self.column_sum - test)
+        
+        #self.column_sum = edges.column_sums(edges.boundary_image(self.image_binary))
         self.grid_boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
             #tools.simple_image_display(self.image_binary, "Straightend Binary")
-            #tools.simple_image_display(self.image_boundaries, "Edge Boundaries")
+            #tools.simple_image_display(self.grid_boundaries, "Edge Boundaries")
         edges.display_overlay(
-            edges.blackwhite_image(np.copy(self.image_boundaries), 0.5),
+            tools.blackwhite_image(np.copy(self.image_boundaries), 0.5),
             np.copy(self.image_binary),
             "Boundary Overlay",
             10,
@@ -246,7 +256,7 @@ class SEMImageDetails:
         # Show the plot
         plt.show()
 
-    def display_fft_image(self: object, fimg: np.array, title: str = None) -> None:
+    def display_fft_image(self: object, fimg: np.ndarray, title: str = None) -> None:
         """Displays the scaled FFT image on a colorblind friendly colorbar
 
         Args:
