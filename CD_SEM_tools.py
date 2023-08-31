@@ -15,7 +15,9 @@ def open_window():
     root.focus_force()
 
 
-def rescale_array(arr: np.ndarray, new_min: float = 0, new_max: float = 1) -> np.ndarray:
+def rescale_array(
+    arr: np.ndarray, new_min: float = 0, new_max: float = 1
+) -> np.ndarray:
     """Rescales the input array between the new_min and new_max values provided
 
     Args:
@@ -35,6 +37,7 @@ def rescale_array(arr: np.ndarray, new_min: float = 0, new_max: float = 1) -> np
         scaled_arr * (new_max - new_min) + new_min
     )  # Rescale to the new range
     return rescaled_arr
+
 
 def blackwhite_image(img: np.ndarray, midlevel: float) -> np.ndarray:
     """Takes and image and turns it into an array of 0's and 1's based on the input threshold
@@ -59,6 +62,7 @@ def blackwhite_image(img: np.ndarray, midlevel: float) -> np.ndarray:
     bw_image = (np.where(smoothed_image >= 0.5, 1, 0)).astype(np.uint8)
 
     return bw_image
+
 
 def clip_image(img: np.ndarray) -> np.ndarray:
     """Takes the input image and clips it between 0.05% and 99.95% of it origonal values.
@@ -93,7 +97,9 @@ def rotate_image(image: np.ndarray, angle: float) -> np.ndarray:
     return rotated_image
 
 
-def pad_vector_to_match_length(vector: np.ndarray, target_vector: np.ndarray) -> np.ndarray:
+def pad_vector_to_match_length(
+    vector: np.ndarray, target_vector: np.ndarray
+) -> np.ndarray:
     """Takes a vector and evenly added zeros to either end until it is the same
         length as the 'taget_vector'
 
@@ -168,6 +174,7 @@ def linear_fit(points: list) -> tuple[float, float]:
     m, c = np.linalg.lstsq(A, y, rcond=None)[0]
     return m, c
 
+
 def list_barplot(list: list | np.ndarray) -> None:
     """Displays a barplot of the provided list
 
@@ -185,3 +192,32 @@ def list_barplot(list: list | np.ndarray) -> None:
     plt.ylabel("Sum")
     plt.title("Sum of Image Lines")
     plt.show()
+
+
+def plot_peaks(peaks: list, scale: float) -> float:
+    """Displays the values of the peaks 'list' against the index of the value shifted to start at 1.
+
+    Args:
+        peaks (list): Pixel location of the peak of the column sum funtion
+        scale (float): size per pixel
+
+    Returns:
+        float: fitpitch to compare to previous values
+    """
+    indices = np.arange(1, len(peaks) + 1)  # Creating an array of indices
+    slope, intercept = np.polyfit(
+        indices, peaks, 1
+    )  # Fit a first-degree polynomial (line)
+
+    fitpitch = slope * scale
+
+    # Create a plot
+    plt.scatter(indices, peaks, label="List Values", color="gray")
+    plt.plot(indices, slope * indices + intercept, label="Fit")
+    plt.xlabel("Line No.")
+    plt.ylabel("Centroid, px")
+    plt.title(f"L0 = {round(fitpitch, 2)} nm, {len(peaks)} lines")
+    plt.legend()
+    plt.show()
+
+    return fitpitch

@@ -42,7 +42,6 @@ class SEMImageDetails:
 
         self.peakposition: np.ndarray | None = None
         self.midlevel: float | None = None
-        self.column_sum: list | None = None
         self.grid_boundaries: dict | None = None
         self.rotated_boundaries: dict | None = (
             None  # Fractional coordinates of rotated image
@@ -89,8 +88,8 @@ class SEMImageDetails:
         # These operations have to deal with threasholding, binary filter
         self.midlevel = edges.threshold_level(self.image_flat, 0.6)
         self.image_binary = tools.blackwhite_image(self.image_flat, self.midlevel)
-            #tools.simple_image_display(self.image_binary, "Original Binary Image")
-        
+        # tools.simple_image_display(self.image_binary, "Original Binary Image")
+
         # Now removing defects and finding line edges
         self.image_boundaries = edges.remove_defects(np.copy(self.image_binary))
 
@@ -99,30 +98,26 @@ class SEMImageDetails:
         self.image_binary = edges.trim_rotation(
             tools.rotate_image(self.image_binary, self.rotate_angle), self.rotate_angle
         )
-        tools.simple_image_display(self.image_binary, "Straightend Binary Image")
 
         # Make boundary coordinate dictionary, rotate to fractional coordinates, trim to same begin and end row coordinates
-        self.rotated_boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
+        self.rotated_boundaries = edges.boundary_coords(np.copy(self.image_boundaries))
         self.rotated_boundaries = edges.rotate_edges(
             self.rotated_boundaries, self.rotate_angle, (self.image_boundaries).shape
         )
 
         # Now that the binary image has been straightened we have to redo the line detection and line defect removal because the rotation of sigle pixel wide lines doesn't map well for visulization
         self.image_boundaries = edges.remove_defects(np.copy(self.image_binary))
-       
-        linesum, peaks = edges.column_sums(util.crop(np.copy(self.image_binary), ((5, 5), (5, 5))))
-        print(len(peaks))
-        tools.list_barplot(linesum)
-        
-        self.column_sum, peaks_boundaries = edges.column_sums(np.copy(self.image_boundaries))
-        print(len(peaks_boundaries))
-        tools.list_barplot(self.column_sum)
-        # tools.list_barplot(self.column_sum - test)
-        
-        #self.column_sum = edges.column_sums(edges.boundary_image(self.image_binary))
-        self.grid_boundaries = edges.boundary_edges(np.copy(self.image_boundaries))
-            #tools.simple_image_display(self.image_binary, "Straightend Binary")
-            #tools.simple_image_display(self.grid_boundaries, "Edge Boundaries")
+
+        linesum, peaks = edges.column_sums(
+            util.crop(np.copy(self.image_binary), ((5, 5), (5, 5)))
+        )
+
+        fitpitch_ceck = tools.plot_peaks(peaks, self.pix_scale * self.pix_size)
+        if abs(fitpitch_ceck - self.fitpitch) / self.fitpitch > 0.1:
+            raise ValueError(
+                f"Inconsistent Fitpitch after rotation and defect removal ({fitpitch_ceck} vs. {self.fitpitch}). Needs manually checked"
+            )
+
         edges.display_overlay(
             tools.blackwhite_image(np.copy(self.image_boundaries), 0.5),
             np.copy(self.image_binary),
@@ -133,6 +128,12 @@ class SEMImageDetails:
         self.bw_order = edges.edge_boundary_order(
             self.image_binary, self.grid_boundaries
         )
+        
+        # tools.list_barplot(linesum)
+
+        # self.column_sum = edges.column_sums(edges.boundary_image(self.image_binary))
+        self.grid_boundaries = edges.boundary_coords(np.copy(self.image_boundaries))
+
         # print(self.bw_order)
 
         ## NEEDS FIXED ###self.fitpitch = edges.pitch_fit(self.boundaries, (self.pix_size * self.pix_scale))
@@ -172,7 +173,7 @@ class SEMImageDetails:
         return metadata.pages[0].tags[tag_name].value
 
     def _pix_data(self, file_path: str, tag_name: str) -> tuple:
-        """Fetches the data associated with the image pixel dimensions from the library in the header. The multiplication of pixel scale and pixel size puts the pixel size in micrometers
+        """Fetches the data associated with the image pixel dimensions from the library in the header. The multiplication of pixel scale and pixel size puts the pixel size in nanometers
 
         Args:
             file_path (str): file path to the image

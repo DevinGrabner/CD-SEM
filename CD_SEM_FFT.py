@@ -109,7 +109,7 @@ def rotated_angle(probe: int, img: np.ndarray, lmax: int) -> float:
         ra = np.arctan((max_index - (probe - 3 + 1)) / (lmax / 2 - 1)) * 180 / np.pi
     else:
         ra = 0
-#    print("Angle of rotation:", ra)
+    #    print("Angle of rotation:", ra)
 
     """
     angle_range = np.linspace(-probe, probe, len(totals))
@@ -193,14 +193,11 @@ def fourier_pitch(img: object) -> float:
         # rewrite peakpositions in format: {"peak order No., peak position in nm^-1"}
         peakpositions = np.transpose([peakpositions, kx])
 
-        fitslope = np.polyfit(peakpositions[:, 0], peakpositions[:, 1], deg=1)
-        slope = fitslope[0]
-        intercept = fitslope[1]
+        slope, intercept = np.polyfit(peakpositions[:, 0], peakpositions[:, 1], deg=1)
 
         # fitpitch = 2 Pi/m /. fitslope
         fitpitch = 2 * np.pi / slope
 
-        """
         # Plotting
         plt.figure(figsize=(8, 6))
         plt.plot(
@@ -218,7 +215,7 @@ def fourier_pitch(img: object) -> float:
         plt.title(f"L0 = {round(fitpitch, 2)} nm")
         plt.legend()
         plt.show()
-        """
+
         return fitpitch
     else:
         raise ValueError(

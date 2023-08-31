@@ -68,7 +68,7 @@ def column_sums(img: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         np.ndarray: Sum of all the columns in the image
     """
     # Sum the columns along axis 0
-    column_sums = img.sum(axis=1)
+    column_sums = img.sum(axis=0)
     peaks = find_peaks(column_sums)[0]
 
     return (column_sums, peaks)
@@ -218,7 +218,7 @@ def trim_rotation(image: np.ndarray, angle_rad: float) -> np.ndarray:
     return trimmed_img
 
 
-def boundary_edges(boundary_img: np.ndarray) -> dict[str, list[tuple]]:
+def boundary_coords(boundary_img: np.ndarray) -> dict[str, list[tuple]]:
     """Takes the cleaned edge boundary image and returns a dictionary with with the coordinates
       of all the points making up a line is made and returned.
 
@@ -271,8 +271,8 @@ def rotate_edges(
         """
         return [
             (
-                (x - center[1]) * cos_theta - (y - center[0]) * sin_theta + center[1],
-                (x - center[1]) * sin_theta + (y - center[0]) * cos_theta + center[0],
+                ((x - center[1]) * sin_theta + (y - center[0]) * cos_theta) + center[0],
+                ((x - center[1]) * cos_theta - (y - center[0]) * sin_theta) + center[1],
             )
             for y, x in coordinates
         ]
@@ -283,26 +283,20 @@ def rotate_edges(
     }
 
     # Find the minimum and maximum y values among the rotated coordinates
-    min_y = max(
-        [
-            min(coord[0] for coord in rotated_coords)
-            for rotated_coords in rotated_dict.values()
-        ]
-    )
-    max_y = min(
-        [
-            max(coord[0] for coord in rotated_coords)
-            for rotated_coords in rotated_dict.values()
-        ]
-    )
+    min_y = max([coords[0][0] for coords in rotated_dict.values()])
 
-    # Trim the rotated coordinates to have the same length and starting/ending row coordinate
+    # Trim the rotated coordinates to have the same length and starting row coordinate
     for key in rotated_dict:
         rotated_coords = rotated_dict[key]
-        filtered_coords = [
-            coord for coord in rotated_coords if min_y <= coord[0] <= max_y
-        ]
+        filtered_coords = [coord for coord in rotated_coords if min_y <= coord[0]]
         rotated_dict[key] = filtered_coords
+
+    # Calculate the minimum length among all lists
+    min_length = min(len(coords) for coords in rotated_dict.values())
+
+    # Trim all lists to the minimum length
+    for key in rotated_dict:
+        rotated_dict[key] = rotated_dict[key][:min_length]
 
     return rotated_dict
 
