@@ -125,14 +125,14 @@ class SEMImageDetails:
             10,
         )
 
+        self.grid_boundaries = edges.boundary_coords(np.copy(self.image_boundaries))
         self.bw_order = edges.edge_boundary_order(
             self.image_binary, self.grid_boundaries
         )
-        
+
         # tools.list_barplot(linesum)
 
         # self.column_sum = edges.column_sums(edges.boundary_image(self.image_binary))
-        self.grid_boundaries = edges.boundary_coords(np.copy(self.image_boundaries))
 
         # print(self.bw_order)
 

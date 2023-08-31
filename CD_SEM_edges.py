@@ -304,39 +304,64 @@ def rotate_edges(
 def edge_boundary_order(
     binary_img: np.ndarray, lines: dict[str, list[tuple]]
 ) -> dict[str, list[tuple]]:
-    """Returns a string defining whether it is a white are black space between the first two lines, defining the begining of the alternating pattern.
+    """Returns list of characters 'b' for black and 'w' for white of what is two the right of each boundary line.
 
     Args:
         binary_img (np.ndarray): The black and white rotated binary image
         lines (dict): Dictionary of coordinate position of boundary edges
 
     Returns:
-        dict: Key is the line edge label and the value is whether the space between line 'n' and 'n+1' is black or white
+        dict: Key is the line edge label and the value is whether the space to the right is black or white
     """
     bw_label = {label: [] for label in lines}
 
-    labels = list(lines.keys())
+    # # Iterate through each line
+    # for key, coords in lines.items():
+    #     coord = coords[10]  # 10th coordinate pair,
 
+    #     # Get the value at the pixel located at midpoint_coordinates from the binary_img
+    #     value_at_coord = binary_img[
+    #         coord[0], coord[1] + 5
+    #     ]  # column coordinate shifted right 2 pixels
+
+    #     if value_at_coord == 1:
+    #         value = "w"
+    #     elif value_at_coord == 0:
+    #         value = "b"
+    #     bw_label[key].append(value)
+
+    labels = list(lines.keys())
     # Iterate through each line pair
     for label_1, label_2 in zip(labels, labels[1:]):
         # Line coords for Line 1 and Line 2
         line1_coords = lines[label_1]
         line2_coords = lines[label_2]
 
-        # Gets the x coordinate for the the line at about the center of the image
-        middle_pixel_line1 = (line1_coords[10])[1]
-        middle_pixel_line2 = (line2_coords[10])[1]
+        a = len(line1_coords)//2
+        # Gets the x coordinate between the two lines
+        middle_pixel_line1 = (line1_coords[a])[1]
+        middle_pixel_line2 = (line2_coords[a])[1]
 
         # Calculate the pixel halfway between the lines
-        midpoint_x = int((middle_pixel_line1 + middle_pixel_line2) // 2)
+        midpoint_x = (middle_pixel_line1 + middle_pixel_line2) // 2
+
+        print(middle_pixel_line1, middle_pixel_line2, midpoint_x)
+
+        # Extract the pixel values from a point in the binary image
+        row_values = binary_img[a, (middle_pixel_line1+1):(middle_pixel_line2-1)]
+        print(row_values)
+
+        # Calculate the average pixel value
+        average_pixel_value = np.mean(row_values)
+        print(average_pixel_value)
 
         # Get the value at the pixel located at midpoint_coordinates from the binary_img
-        value_at_midpoint = binary_img[(line1_coords[10])[0], midpoint_x]
+        value_at_midpoint = binary_img[(line1_coords[a])[0], midpoint_x]
 
-        if value_at_midpoint == 1:
-            value = "white"
+        if value_at_midpoint > 0:
+            value = "w"
         elif value_at_midpoint == 0:
-            value = "black"
+            value = "b"
         bw_label[label_1].append(value)
 
     return bw_label
